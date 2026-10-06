@@ -20,6 +20,7 @@
 
 body {
   margin: 0;
+
   min-width: 320px;
   min-height: 100vh;
 
@@ -29,11 +30,17 @@ body {
       #18181b 0%,
       #09090b 45%
     );
+
+  color: #f4f4f5;
 }
 
 button,
 input {
   font: inherit;
+}
+
+button {
+  cursor: pointer;
 }
 
 .app {
@@ -55,10 +62,13 @@ input {
   margin: 8px 0;
 
   font-size: 52px;
+
   letter-spacing: -0.05em;
 }
 
 .header p {
+  margin: 0;
+
   color: #a1a1aa;
 }
 
@@ -66,6 +76,7 @@ input {
   color: #71717a;
 
   font-size: 11px;
+
   font-weight: 700;
 
   letter-spacing: 0.15em;
@@ -113,7 +124,9 @@ input {
 }
 
 .metric-card strong {
-  margin: 12px 0 4px;
+  margin:
+    12px 0
+    4px;
 
   font-size: 30px;
 }
@@ -189,7 +202,9 @@ input {
 
   border-radius: 10px;
 
-  padding: 12px 14px;
+  padding:
+    12px
+    14px;
 }
 
 input:focus {
@@ -197,13 +212,14 @@ input:focus {
 }
 
 button {
-  height: 43px;
+  min-height: 43px;
 
   border: none;
 
   border-radius: 10px;
 
-  padding: 0 20px;
+  padding:
+    0 20px;
 
   background: #fafafa;
 
@@ -211,7 +227,9 @@ button {
 
   font-weight: 700;
 
-  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
 }
 
 button:hover {
@@ -220,7 +238,108 @@ button:hover {
 
 button:disabled {
   opacity: 0.5;
+
   cursor: default;
+}
+
+.error {
+  margin:
+    16px 0
+    0;
+
+  border:
+    1px solid
+    rgba(
+      248,
+      113,
+      113,
+      0.25
+    );
+
+  border-radius: 10px;
+
+  padding: 12px;
+
+  background:
+    rgba(
+      127,
+      29,
+      29,
+      0.15
+    );
+
+  color: #f87171;
+}
+
+.tasks-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.task-item {
+  display: flex;
+
+  align-items: center;
+
+  justify-content:
+    space-between;
+
+  gap: 16px;
+
+  border:
+    1px solid
+    #27272a;
+
+  border-radius: 12px;
+
+  padding: 16px;
+
+  background: #09090b;
+}
+
+.task-item strong {
+  color: #fafafa;
+}
+
+.task-item p {
+  margin:
+    5px 0
+    0;
+
+  color: #a1a1aa;
+
+  font-size: 13px;
+}
+
+.status {
+  display: inline-flex;
+
+  align-items: center;
+
+  width: fit-content;
+
+  border:
+    1px solid
+    #3f3f46;
+
+  border-radius: 7px;
+
+  padding:
+    5px
+    8px;
+
+  background: #18181b;
+
+  color: #d4d4d8;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  white-space: nowrap;
 }
 
 .table {
@@ -233,20 +352,25 @@ button:disabled {
   display: grid;
 
   grid-template-columns:
-    2fr
-    1fr
-    1fr
-    100px;
+    minmax(180px, 2fr)
+    minmax(120px, 1fr)
+    minmax(120px, 1fr)
+    70px
+    150px;
 
   gap: 16px;
 
   align-items: center;
 
-  min-height: 56px;
+  min-height: 64px;
 
   border-bottom:
     1px solid
     #27272a;
+}
+
+.table-row:last-child {
+  border-bottom: none;
 }
 
 .table-header {
@@ -261,6 +385,37 @@ button:disabled {
   letter-spacing: 0.08em;
 }
 
+.action-cell {
+  display: flex;
+
+  align-items: center;
+
+  justify-content:
+    flex-start;
+}
+
+.prospect-button {
+  min-height: 36px;
+
+  padding:
+    0
+    14px;
+
+  border:
+    1px solid
+    #3f3f46;
+
+  background: #27272a;
+
+  color: #fafafa;
+
+  font-size: 12px;
+}
+
+.prospect-button:hover {
+  background: #3f3f46;
+}
+
 .empty {
   padding: 40px;
 
@@ -269,21 +424,31 @@ button:disabled {
   color: #71717a;
 }
 
-.error {
-  margin-top: 16px;
-
-  color: #f87171;
-}
-
 @media (
   max-width: 900px
 ) {
+  .app {
+    width:
+      min(
+        100% - 24px,
+        1200px
+      );
+
+    padding-top: 24px;
+  }
+
+  .header h1 {
+    font-size: 40px;
+  }
+
   .metrics {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
   }
 
   .company-form {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
   }
 
   .table {
@@ -291,6 +456,14 @@ button:disabled {
   }
 
   .table-row {
-    min-width: 650px;
+    min-width: 800px;
+  }
+
+  .task-item {
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
   }
 }

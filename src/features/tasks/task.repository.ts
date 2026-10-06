@@ -4,6 +4,7 @@ import {
 
 import type {
   TaskType,
+  TaskWithProspect,
 } from "./task.types";
 
 export async function createTaskRepository(
@@ -33,4 +34,37 @@ export async function createTaskRepository(
       title,
     ],
   );
+}
+
+export async function listPendingTasksRepository():
+Promise<TaskWithProspect[]> {
+  const db = await getDatabase();
+
+  return db.select<TaskWithProspect[]>(`
+    SELECT
+      t.*,
+
+      c.name AS company_name,
+
+      p.status AS prospect_status
+
+    FROM tasks t
+
+    INNER JOIN prospects p
+      ON p.id = t.prospect_id
+
+    INNER JOIN companies c
+      ON c.id = p.company_id
+
+    WHERE t.completed_at IS NULL
+
+    ORDER BY
+      CASE
+        WHEN t.priority = 'HIGH' THEN 1
+        WHEN t.priority = 'NORMAL' THEN 2
+        ELSE 3
+      END,
+
+      t.id ASC
+  `);
 }

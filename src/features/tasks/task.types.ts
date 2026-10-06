@@ -28,3 +28,10 @@ export interface Task {
 
   created_at: string;
 }
+
+export interface TaskWithProspect
+  extends Task {
+  company_name: string;
+
+  prospect_status: string;
+}

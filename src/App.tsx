@@ -1,5 +1,12 @@
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import type {
+  FormEvent,
+} from "react";
+
 import "./App.css";
 
 import {
@@ -12,24 +19,107 @@ import type {
 } from "./features/companies/company.types";
 
 import {
+  createProspect,
+  listProspects,
+} from "./features/prospects/prospect.service";
+
+import type {
+  ProspectWithCompany,
+} from "./features/prospects/prospect.types";
+
+import {
+  listPendingTasks,
+} from "./features/tasks/task.service";
+
+import type {
+  TaskWithProspect,
+} from "./features/tasks/task.types";
+
+import {
   initDatabase,
 } from "./lib/migrations";
 
 function App() {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [
+    companies,
+    setCompanies,
+  ] = useState<Company[]>([]);
 
-  const [name, setName] = useState("");
-  const [segment, setSegment] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
+  const [
+    prospects,
+    setProspects,
+  ] = useState<
+    ProspectWithCompany[]
+  >([]);
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [
+    tasks,
+    setTasks,
+  ] = useState<
+    TaskWithProspect[]
+  >([]);
+
+  const [
+    name,
+    setName,
+  ] = useState("");
+
+  const [
+    segment,
+    setSegment,
+  ] = useState("");
+
+  const [
+    city,
+    setCity,
+  ] = useState("");
+
+  const [
+    state,
+    setState,
+  ] = useState("");
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    prospectingCompanyId,
+    setProspectingCompanyId,
+  ] = useState<number | null>(
+    null,
+  );
+
+  const [
+    error,
+    setError,
+  ] = useState("");
 
   async function loadCompanies() {
-    const data = await listCompanies();
+    const data =
+      await listCompanies();
+
     setCompanies(data);
+  }
+
+  async function loadProspects() {
+    const data =
+      await listProspects();
+
+    setProspects(data);
+  }
+
+  async function loadTasks() {
+    const data =
+      await listPendingTasks();
+
+    setTasks(data);
   }
 
   async function startApplication() {
@@ -37,7 +127,12 @@ function App() {
       setError("");
 
       await initDatabase();
-      await loadCompanies();
+
+      await Promise.all([
+        loadCompanies(),
+        loadProspects(),
+        loadTasks(),
+      ]);
     } catch (err) {
       console.error(err);
 
@@ -61,7 +156,10 @@ function App() {
     event.preventDefault();
 
     if (!name.trim()) {
-      setError("Informe o nome da empresa.");
+      setError(
+        "Informe o nome da empresa.",
+      );
+
       return;
     }
 
@@ -70,10 +168,20 @@ function App() {
       setError("");
 
       await createCompany({
-        name: name.trim(),
-        segment: segment.trim() || undefined,
-        city: city.trim() || undefined,
-        state: state.trim() || undefined,
+        name:
+          name.trim(),
+
+        segment:
+          segment.trim() ||
+          undefined,
+
+        city:
+          city.trim() ||
+          undefined,
+
+        state:
+          state.trim() ||
+          undefined,
       });
 
       setName("");
@@ -95,10 +203,56 @@ function App() {
     }
   }
 
+  async function handleCreateProspect(
+    companyId: number,
+  ) {
+    try {
+      setError("");
+
+      setProspectingCompanyId(
+        companyId,
+      );
+
+      await createProspect(
+        companyId,
+      );
+
+      await Promise.all([
+        loadProspects(),
+        loadTasks(),
+      ]);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao adicionar empresa à prospecção.",
+      );
+    } finally {
+      setProspectingCompanyId(
+        null,
+      );
+    }
+  }
+
+  function companyIsProspect(
+    companyId: number,
+  ) {
+    return prospects.some(
+      (prospect) =>
+        prospect.company_id ===
+        companyId,
+    );
+  }
+
   if (loading) {
     return (
       <main className="app">
-        <p>Inicializando Creava Sales Engine...</p>
+        <p>
+          Inicializando Creava
+          Sales Engine...
+        </p>
       </main>
     );
   }
@@ -111,32 +265,113 @@ function App() {
             CREAVA DIGITAL
           </span>
 
-          <h1>Sales Engine</h1>
+          <h1>
+            Sales Engine
+          </h1>
 
           <p>
-            Motor local de prospecção comercial.
+            Motor local de
+            prospecção comercial.
           </p>
         </div>
       </header>
 
       <section className="metrics">
         <article className="metric-card">
-          <span>Empresas</span>
-          <strong>{companies.length}</strong>
-          <small>Cadastradas localmente</small>
+          <span>
+            Empresas
+          </span>
+
+          <strong>
+            {companies.length}
+          </strong>
+
+          <small>
+            Cadastradas localmente
+          </small>
         </article>
 
         <article className="metric-card">
-          <span>Prospects</span>
-          <strong>0</strong>
-          <small>Vamos criar depois</small>
+          <span>
+            Prospects
+          </span>
+
+          <strong>
+            {prospects.length}
+          </strong>
+
+          <small>
+            Em prospecção
+          </small>
         </article>
 
         <article className="metric-card">
-          <span>Pipeline</span>
-          <strong>R$ 0</strong>
-          <small>Sem oportunidades ainda</small>
+          <span>
+            Ações pendentes
+          </span>
+
+          <strong>
+            {tasks.length}
+          </strong>
+
+          <small>
+            Para executar
+          </small>
         </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-title">
+          <div>
+            <span className="eyebrow">
+              TODAY
+            </span>
+
+            <h2>
+              Próximas ações
+            </h2>
+          </div>
+
+          <span className="counter">
+            {tasks.length} pendentes
+          </span>
+        </div>
+
+        {tasks.length === 0 ? (
+          <div className="empty">
+            Nenhuma ação
+            pendente.
+          </div>
+        ) : (
+          <div className="tasks-list">
+            {tasks.map(
+              (task) => (
+                <article
+                  className="task-item"
+                  key={task.id}
+                >
+                  <div>
+                    <strong>
+                      {
+                        task.company_name
+                      }
+                    </strong>
+
+                    <p>
+                      {task.title}
+                    </p>
+                  </div>
+
+                  <span className="status">
+                    {
+                      task.prospect_status
+                    }
+                  </span>
+                </article>
+              ),
+            )}
+          </div>
+        )}
       </section>
 
       <section className="panel">
@@ -146,7 +381,9 @@ function App() {
               NOVA EMPRESA
             </span>
 
-            <h2>Cadastrar empresa</h2>
+            <h2>
+              Cadastrar empresa
+            </h2>
           </div>
         </div>
 
@@ -159,8 +396,13 @@ function App() {
 
             <input
               value={name}
-              onChange={(event) =>
-                setName(event.target.value)
+              onChange={(
+                event,
+              ) =>
+                setName(
+                  event.target
+                    .value,
+                )
               }
               placeholder="Clínica Excellence"
             />
@@ -171,8 +413,13 @@ function App() {
 
             <input
               value={segment}
-              onChange={(event) =>
-                setSegment(event.target.value)
+              onChange={(
+                event,
+              ) =>
+                setSegment(
+                  event.target
+                    .value,
+                )
               }
               placeholder="Odontologia"
             />
@@ -183,8 +430,13 @@ function App() {
 
             <input
               value={city}
-              onChange={(event) =>
-                setCity(event.target.value)
+              onChange={(
+                event,
+              ) =>
+                setCity(
+                  event.target
+                    .value,
+                )
               }
               placeholder="Cuiabá"
             />
@@ -195,8 +447,13 @@ function App() {
 
             <input
               value={state}
-              onChange={(event) =>
-                setState(event.target.value)
+              onChange={(
+                event,
+              ) =>
+                setState(
+                  event.target
+                    .value,
+                )
               }
               placeholder="MT"
               maxLength={2}
@@ -227,7 +484,9 @@ function App() {
               DATABASE
             </span>
 
-            <h2>Empresas</h2>
+            <h2>
+              Empresas
+            </h2>
           </div>
 
           <span className="counter">
@@ -237,39 +496,100 @@ function App() {
 
         {companies.length === 0 ? (
           <div className="empty">
-            Nenhuma empresa cadastrada.
+            Nenhuma empresa
+            cadastrada.
           </div>
         ) : (
           <div className="table">
             <div className="table-row table-header">
-              <span>Empresa</span>
-              <span>Segmento</span>
-              <span>Cidade</span>
-              <span>UF</span>
+              <span>
+                Empresa
+              </span>
+
+              <span>
+                Segmento
+              </span>
+
+              <span>
+                Cidade
+              </span>
+
+              <span>
+                UF
+              </span>
+
+              <span>
+                Ação
+              </span>
             </div>
 
-            {companies.map((company) => (
-              <div
-                className="table-row"
-                key={company.id}
-              >
-                <strong>
-                  {company.name}
-                </strong>
+            {companies.map(
+              (company) => {
+                const isProspect =
+                  companyIsProspect(
+                    company.id,
+                  );
 
-                <span>
-                  {company.segment || "—"}
-                </span>
+                const isLoading =
+                  prospectingCompanyId ===
+                  company.id;
 
-                <span>
-                  {company.city || "—"}
-                </span>
+                return (
+                  <div
+                    className="table-row"
+                    key={
+                      company.id
+                    }
+                  >
+                    <strong>
+                      {
+                        company.name
+                      }
+                    </strong>
 
-                <span>
-                  {company.state || "—"}
-                </span>
-              </div>
-            ))}
+                    <span>
+                      {company.segment ||
+                        "—"}
+                    </span>
+
+                    <span>
+                      {company.city ||
+                        "—"}
+                    </span>
+
+                    <span>
+                      {company.state ||
+                        "—"}
+                    </span>
+
+                    <div className="action-cell">
+                      {isProspect ? (
+                        <span className="status">
+                          Em prospecção
+                        </span>
+                      ) : (
+                        <button
+                          className="prospect-button"
+                          type="button"
+                          disabled={
+                            isLoading
+                          }
+                          onClick={() =>
+                            void handleCreateProspect(
+                              company.id,
+                            )
+                          }
+                        >
+                          {isLoading
+                            ? "Adicionando..."
+                            : "Prospectar"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              },
+            )}
           </div>
         )}
       </section>
