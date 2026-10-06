@@ -6,6 +6,10 @@ import {
 } from "./prospect.repository";
 
 import {
+  setLeadStatusRepository,
+} from "../companies/company.repository";
+
+import {
   createTaskRepository,
 } from "../tasks/task.repository";
 
@@ -49,6 +53,8 @@ export async function createProspect(
     "PROSPECT_CREATED",
     "Empresa adicionada à prospecção.",
   );
+
+  await setLeadStatusRepository(companyId, "READY");
 
   return prospectId;
 }

@@ -1,3 +1,10 @@
+export type LeadStatus =
+  | "DISCOVERED"
+  | "ENRICHING"
+  | "QUALIFIED"
+  | "READY"
+  | "DISQUALIFIED";
+
 export interface Company {
   id: number;
   name: string;
@@ -12,6 +19,25 @@ export interface Company {
   instagram: string | null;
 
   google_place_id: string | null;
+
+  cnpj: string | null;
+  legal_name: string | null;
+  cnae: string | null;
+  company_size: string | null;
+  registration_status: string | null;
+  opened_at: string | null;
+  capital: number | null;
+
+  address: string | null;
+  category: string | null;
+  rating: number | null;
+  reviews_count: number | null;
+
+  domain: string | null;
+  phone_normalized: string | null;
+
+  lead_status: LeadStatus;
+  disqualified_reason: string | null;
 
   created_at: string;
   updated_at: string;
@@ -30,4 +56,16 @@ export interface CreateCompanyInput {
   instagram?: string;
 
   googlePlaceId?: string;
+
+  cnpj?: string;
+  address?: string;
+  category?: string;
+  rating?: number;
+  reviewsCount?: number;
 }
+
+export type SourceType =
+  | "GOOGLE_PLACES"
+  | "CNPJ"
+  | "WEBSITE"
+  | "MANUAL";

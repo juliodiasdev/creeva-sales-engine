@@ -25,7 +25,14 @@ export async function createProspectRepository(
         $1,
         'READY',
         'NORMAL',
-        0,
+        COALESCE(
+          (
+            SELECT total FROM company_scores
+            WHERE company_id = $1
+            ORDER BY id DESC LIMIT 1
+          ),
+          0
+        ),
         'Realizar primeiro contato'
       )
     `,

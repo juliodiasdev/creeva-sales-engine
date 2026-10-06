@@ -21,8 +21,9 @@ import type {
   OutreachDraft,
 } from "./outreach.types";
 
-// Será configurável em Settings (fase futura).
-const FOLLOW_UP_DELAY_DAYS = 2;
+import {
+  getNumberSetting,
+} from "../settings/settings.service";
 
 const OUTREACH_TASK_TYPES = [
   "FIRST_CONTACT",
@@ -140,6 +141,11 @@ export async function markTaskAsSent(
   );
 
   if (task.type === "FIRST_CONTACT") {
+    const FOLLOW_UP_DELAY_DAYS = await getNumberSetting(
+      "follow_up_delay_days",
+      2,
+    );
+
     await createTaskRepository(
       prospect.id,
       "FOLLOW_UP",

@@ -32,8 +32,9 @@ import {
 import { LOST_REASONS } from "../deals/deal.types";
 import type { LostReason } from "../deals/deal.types";
 
-// Serão configuráveis em Settings.
-export const PROPOSAL_FOLLOW_UP_DAYS = 3;
+import {
+  getNumberSetting,
+} from "../settings/settings.service";
 
 /** Estágios que exigem dados próprios (formulário dedicado). */
 export const GUARDED_STATUSES: ProspectStatus[] = [
@@ -289,6 +290,11 @@ export async function sendProposal(
     "PROPOSAL",
     "FOLLOW_UP",
   ]);
+
+  const PROPOSAL_FOLLOW_UP_DAYS = await getNumberSetting(
+    "proposal_follow_up_days",
+    3,
+  );
 
   await createTaskRepository(
     prospectId,
