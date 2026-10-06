@@ -14,6 +14,8 @@ import {
   importBackup,
 } from "../features/backup/backup.service";
 
+import { testOpenAiConnection } from "../features/ai/openai.client";
+
 import {
   clearApiKeys,
   clearBusinessData,
@@ -140,6 +142,17 @@ export function SettingsPage() {
     }
   }
 
+  async function handleTestOpenAi() {
+    try {
+      setError("");
+      setMessage("Testando OpenAI…");
+      setMessage(await testOpenAiConnection());
+    } catch (err) {
+      setMessage("");
+      setError(errorMessage(err, "Falha ao testar a OpenAI."));
+    }
+  }
+
   async function removeSecret(key: SettingKey) {
     await setSetting(key, "");
     await load();
@@ -247,6 +260,15 @@ export function SettingsPage() {
             onClick={() => void handleTestGoogle()}
           >
             Testar Google Places
+          </button>
+
+          <button
+            type="button"
+            className="secondary"
+            disabled={!configured.openai_api_key}
+            onClick={() => void handleTestOpenAi()}
+          >
+            Testar OpenAI
           </button>
         </div>
 
