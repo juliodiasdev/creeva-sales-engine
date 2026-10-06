@@ -14,6 +14,9 @@ import {
   importBackup,
 } from "../features/backup/backup.service";
 
+import { runDiagnostics } from "../features/diagnostics/diagnostics.service";
+import type { DiagnosticStep } from "../features/diagnostics/diagnostics.service";
+
 import { testOpenAiConnection } from "../features/ai/openai.client";
 
 import {
@@ -74,6 +77,8 @@ export function SettingsPage() {
   const [usage, setUsage] = useState<
     { provider: string; requests: number; tokens: number; estimated_cost: number }[]
   >([]);
+  const [diag, setDiag] = useState<DiagnosticStep[]>([]);
+  const [diagRunning, setDiagRunning] = useState(false);
   const [danger, setDanger] = useState<DangerAction | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [message, setMessage] = useState("");
@@ -139,6 +144,18 @@ export function SettingsPage() {
       await load();
     } catch (err) {
       setError(errorMessage(err, "Erro ao limpar."));
+    }
+  }
+
+  async function handleDiagnostics() {
+    setDiagRunning(true);
+    setDiag([]);
+
+    try {
+      await runDiagnostics(setDiag);
+      await load();
+    } finally {
+      setDiagRunning(false);
     }
   }
 
@@ -327,6 +344,43 @@ export function SettingsPage() {
             />
           </label>
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-title">
+          <div>
+            <span className="eyebrow">DIAGNÓSTICO</span>
+            <h2>Testar tudo</h2>
+          </div>
+
+          <button
+            type="button"
+            disabled={diagRunning}
+            onClick={() => void handleDiagnostics()}
+          >
+            {diagRunning ? "Testando…" : "Rodar diagnóstico completo"}
+          </button>
+        </div>
+
+        <p className="muted">
+          Testa banco, Google Places, OpenAI e o fluxo completo (empresa de
+          teste → site → sinais → score → análise e mensagem por IA). A empresa
+          de teste é removida no final. Usa poucas chamadas pagas.
+        </p>
+
+        {diag.length > 0 && (
+          <ul className="reasons">
+            {diag.map((step) => (
+              <li key={step.name}>
+                <strong>
+                  {step.status === "OK" ? "✔" : step.status === "FALHOU" ? "✘" : "–"}{" "}
+                  {step.name}
+                </strong>{" "}
+                — {step.detail}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="panel danger-zone">
