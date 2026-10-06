@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import "./App.css";
 
 import {
   createCompany,
-  initDatabase,
   listCompanies,
-} from "./lib/database";
+} from "./features/companies/company.service";
 
-import type { Company } from "./lib/database";
+import type {
+  Company,
+} from "./features/companies/company.types";
 
-import "./App.css";
+import {
+  initDatabase,
+} from "./lib/migrations";
 
 function App() {
   const [companies, setCompanies] = useState<Company[]>([]);
