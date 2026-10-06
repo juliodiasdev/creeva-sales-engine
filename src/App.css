@@ -508,3 +508,54 @@ button:disabled {
   align-items: center;
   gap: 8px;
 }
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  padding: 28px 16px;
+  border-right: 1px solid #27272a;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #a1a1aa;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: #18181b;
+  color: #f4f4f5;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  padding: 36px 40px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}

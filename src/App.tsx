@@ -3,705 +3,121 @@ import {
   useState,
 } from "react";
 
-import type {
-  FormEvent,
-} from "react";
-
 import "./App.css";
 
 import {
-  createCompany,
-  listCompanies,
-} from "./features/companies/company.service";
+  Sidebar,
+} from "./components/Sidebar";
 
 import type {
-  Company,
-} from "./features/companies/company.types";
+  PageId,
+} from "./components/Sidebar";
 
-import {
-  createProspect,
-  listProspects,
-} from "./features/prospects/prospect.service";
+import { Placeholder } from "./components/Placeholder";
 
-import type {
-  ProspectWithCompany,
-} from "./features/prospects/prospect.types";
-
-import {
-  listPendingTasks,
-} from "./features/tasks/task.service";
-
-import type {
-  TaskWithProspect,
-} from "./features/tasks/task.types";
-
-import {
-  markTaskAsSent,
-  prepareOutreach,
-} from "./features/outreach/outreach.service";
-
-import {
-  OutreachPanel,
-} from "./features/outreach/OutreachPanel";
-
-import type {
-  OutreachDraft,
-} from "./features/outreach/outreach.types";
+import { TodayPage } from "./pages/TodayPage";
+import { CompaniesPage } from "./pages/CompaniesPage";
+import { ProspectsPage } from "./pages/ProspectsPage";
 
 import {
   initDatabase,
 } from "./lib/migrations";
 
-function App() {
-  const [
-    companies,
-    setCompanies,
-  ] = useState<Company[]>([]);
+const PLACEHOLDERS: Partial<
+  Record<PageId, [string, string]>
+> = {
+  dashboard: [
+    "Dashboard",
+    "Métricas reais de funil, conversão e receita.",
+  ],
+  discovery: [
+    "Discovery",
+    "Busca de empresas por segmento e cidade.",
+  ],
+  pipeline: [
+    "Pipeline",
+    "Visão do funil por estágio comercial.",
+  ],
+  playbook: [
+    "Playbook",
+    "Biblioteca de scripts por segmento.",
+  ],
+  settings: [
+    "Settings",
+    "Preferências e chaves de API.",
+  ],
+};
 
-  const [
-    prospects,
-    setProspects,
-  ] = useState<
-    ProspectWithCompany[]
-  >([]);
+function renderPage(page: PageId) {
+  switch (page) {
+    case "today":
+      return <TodayPage />;
+    case "companies":
+      return <CompaniesPage />;
+    case "prospects":
+      return <ProspectsPage />;
+    default: {
+      const [title, description] =
+        PLACEHOLDERS[page] ?? [page, ""];
 
-  const [
-    tasks,
-    setTasks,
-  ] = useState<
-    TaskWithProspect[]
-  >([]);
-
-  const [
-    name,
-    setName,
-  ] = useState("");
-
-  const [
-    segment,
-    setSegment,
-  ] = useState("");
-
-  const [
-    city,
-    setCity,
-  ] = useState("");
-
-  const [
-    state,
-    setState,
-  ] = useState("");
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-  const [
-    saving,
-    setSaving,
-  ] = useState(false);
-
-  const [
-    prospectingCompanyId,
-    setProspectingCompanyId,
-  ] = useState<number | null>(
-    null,
-  );
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  const [
-    draft,
-    setDraft,
-  ] = useState<OutreachDraft | null>(
-    null,
-  );
-
-  async function loadCompanies() {
-    const data =
-      await listCompanies();
-
-    setCompanies(data);
-  }
-
-  async function loadProspects() {
-    const data =
-      await listProspects();
-
-    setProspects(data);
-  }
-
-  async function loadTasks() {
-    const data =
-      await listPendingTasks();
-
-    setTasks(data);
-  }
-
-  async function startApplication() {
-    try {
-      setError("");
-
-      await initDatabase();
-
-      await Promise.all([
-        loadCompanies(),
-        loadProspects(),
-        loadTasks(),
-      ]);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao inicializar o banco de dados.",
+      return (
+        <Placeholder
+          title={title}
+          description={description}
+        />
       );
-    } finally {
-      setLoading(false);
     }
   }
+}
+
+function App() {
+  const [page, setPage] =
+    useState<PageId>("today");
+
+  const [ready, setReady] = useState(false);
+
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    void startApplication();
+    initDatabase()
+      .then(() => setReady(true))
+      .catch((err) => {
+        console.error(err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Erro ao inicializar o banco de dados.",
+        );
+      });
   }, []);
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    if (!name.trim()) {
-      setError(
-        "Informe o nome da empresa.",
-      );
-
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError("");
-
-      await createCompany({
-        name:
-          name.trim(),
-
-        segment:
-          segment.trim() ||
-          undefined,
-
-        city:
-          city.trim() ||
-          undefined,
-
-        state:
-          state.trim() ||
-          undefined,
-      });
-
-      setName("");
-      setSegment("");
-      setCity("");
-      setState("");
-
-      await loadCompanies();
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao cadastrar empresa.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleCreateProspect(
-    companyId: number,
-  ) {
-    try {
-      setError("");
-
-      setProspectingCompanyId(
-        companyId,
-      );
-
-      await createProspect(
-        companyId,
-      );
-
-      await Promise.all([
-        loadProspects(),
-        loadTasks(),
-      ]);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao adicionar empresa à prospecção.",
-      );
-    } finally {
-      setProspectingCompanyId(
-        null,
-      );
-    }
-  }
-
-  async function handlePrepareOutreach(
-    taskId: number,
-  ) {
-    try {
-      setError("");
-
-      setDraft(
-        await prepareOutreach(taskId),
-      );
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao preparar abordagem.",
-      );
-    }
-  }
-
-  async function handleMarkSent(
-    taskId: number,
-    message: string,
-  ) {
-    try {
-      setError("");
-
-      await markTaskAsSent(
-        taskId,
-        message,
-      );
-
-      setDraft(null);
-
-      await Promise.all([
-        loadProspects(),
-        loadTasks(),
-      ]);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao registrar envio.",
-      );
-    }
-  }
-
-  function companyIsProspect(
-    companyId: number,
-  ) {
-    return prospects.some(
-      (prospect) =>
-        prospect.company_id ===
-        companyId,
+  if (error) {
+    return (
+      <main className="app">
+        <p className="error">{error}</p>
+      </main>
     );
   }
 
-  if (loading) {
+  if (!ready) {
     return (
       <main className="app">
-        <p>
-          Inicializando Creava
-          Sales Engine...
-        </p>
+        <p>Inicializando Creava Sales Engine...</p>
       </main>
     );
   }
 
   return (
-    <main className="app">
-      <header className="header">
-        <div>
-          <span className="eyebrow">
-            CREAVA DIGITAL
-          </span>
+    <div className="shell">
+      <Sidebar
+        current={page}
+        onNavigate={setPage}
+      />
 
-          <h1>
-            Sales Engine
-          </h1>
-
-          <p>
-            Motor local de
-            prospecção comercial.
-          </p>
-        </div>
-      </header>
-
-      <section className="metrics">
-        <article className="metric-card">
-          <span>
-            Empresas
-          </span>
-
-          <strong>
-            {companies.length}
-          </strong>
-
-          <small>
-            Cadastradas localmente
-          </small>
-        </article>
-
-        <article className="metric-card">
-          <span>
-            Prospects
-          </span>
-
-          <strong>
-            {prospects.length}
-          </strong>
-
-          <small>
-            Em prospecção
-          </small>
-        </article>
-
-        <article className="metric-card">
-          <span>
-            Ações pendentes
-          </span>
-
-          <strong>
-            {tasks.length}
-          </strong>
-
-          <small>
-            Para executar
-          </small>
-        </article>
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">
-          <div>
-            <span className="eyebrow">
-              TODAY
-            </span>
-
-            <h2>
-              Próximas ações
-            </h2>
-          </div>
-
-          <span className="counter">
-            {tasks.length} pendentes
-          </span>
-        </div>
-
-        {tasks.length === 0 ? (
-          <div className="empty">
-            Nenhuma ação
-            pendente.
-          </div>
-        ) : (
-          <div className="tasks-list">
-            {tasks.map(
-              (task) => (
-                <article
-                  className="task-item"
-                  key={task.id}
-                >
-                  <div className="task-body">
-                    <strong>
-                      {
-                        task.company_name
-                      }
-                    </strong>
-
-                    <p>
-                      {task.title}
-                    </p>
-
-                    {draft?.taskId ===
-                      task.id && (
-                      <OutreachPanel
-                        key={task.id}
-                        draft={draft}
-                        onCancel={() =>
-                          setDraft(null)
-                        }
-                        onSent={(
-                          message,
-                        ) =>
-                          handleMarkSent(
-                            task.id,
-                            message,
-                          )
-                        }
-                      />
-                    )}
-                  </div>
-
-                  <div className="task-actions">
-                    {(task.type ===
-                      "FIRST_CONTACT" ||
-                      task.type ===
-                        "FOLLOW_UP") &&
-                      draft?.taskId !==
-                        task.id && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handlePrepareOutreach(
-                              task.id,
-                            )
-                          }
-                        >
-                          Preparar abordagem
-                        </button>
-                      )}
-
-                    <span className="status">
-                      {
-                        task.prospect_status
-                      }
-                    </span>
-                  </div>
-                </article>
-              ),
-            )}
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">
-          <div>
-            <span className="eyebrow">
-              NOVA EMPRESA
-            </span>
-
-            <h2>
-              Cadastrar empresa
-            </h2>
-          </div>
-        </div>
-
-        <form
-          className="company-form"
-          onSubmit={handleSubmit}
-        >
-          <label>
-            Empresa
-
-            <input
-              value={name}
-              onChange={(
-                event,
-              ) =>
-                setName(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="Clínica Excellence"
-            />
-          </label>
-
-          <label>
-            Segmento
-
-            <input
-              value={segment}
-              onChange={(
-                event,
-              ) =>
-                setSegment(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="Odontologia"
-            />
-          </label>
-
-          <label>
-            Cidade
-
-            <input
-              value={city}
-              onChange={(
-                event,
-              ) =>
-                setCity(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="Cuiabá"
-            />
-          </label>
-
-          <label>
-            UF
-
-            <input
-              value={state}
-              onChange={(
-                event,
-              ) =>
-                setState(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="MT"
-              maxLength={2}
-            />
-          </label>
-
-          <button
-            type="submit"
-            disabled={saving}
-          >
-            {saving
-              ? "Salvando..."
-              : "Adicionar empresa"}
-          </button>
-        </form>
-
-        {error && (
-          <p className="error">
-            {error}
-          </p>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">
-          <div>
-            <span className="eyebrow">
-              DATABASE
-            </span>
-
-            <h2>
-              Empresas
-            </h2>
-          </div>
-
-          <span className="counter">
-            {companies.length} registros
-          </span>
-        </div>
-
-        {companies.length === 0 ? (
-          <div className="empty">
-            Nenhuma empresa
-            cadastrada.
-          </div>
-        ) : (
-          <div className="table">
-            <div className="table-row table-header">
-              <span>
-                Empresa
-              </span>
-
-              <span>
-                Segmento
-              </span>
-
-              <span>
-                Cidade
-              </span>
-
-              <span>
-                UF
-              </span>
-
-              <span>
-                Ação
-              </span>
-            </div>
-
-            {companies.map(
-              (company) => {
-                const isProspect =
-                  companyIsProspect(
-                    company.id,
-                  );
-
-                const isLoading =
-                  prospectingCompanyId ===
-                  company.id;
-
-                return (
-                  <div
-                    className="table-row"
-                    key={
-                      company.id
-                    }
-                  >
-                    <strong>
-                      {
-                        company.name
-                      }
-                    </strong>
-
-                    <span>
-                      {company.segment ||
-                        "—"}
-                    </span>
-
-                    <span>
-                      {company.city ||
-                        "—"}
-                    </span>
-
-                    <span>
-                      {company.state ||
-                        "—"}
-                    </span>
-
-                    <div className="action-cell">
-                      {isProspect ? (
-                        <span className="status">
-                          Em prospecção
-                        </span>
-                      ) : (
-                        <button
-                          className="prospect-button"
-                          type="button"
-                          disabled={
-                            isLoading
-                          }
-                          onClick={() =>
-                            void handleCreateProspect(
-                              company.id,
-                            )
-                          }
-                        >
-                          {isLoading
-                            ? "Adicionando..."
-                            : "Prospectar"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              },
-            )}
-          </div>
-        )}
-      </section>
-    </main>
+      <main className="content">
+        {renderPage(page)}
+      </main>
+    </div>
   );
 }
 
