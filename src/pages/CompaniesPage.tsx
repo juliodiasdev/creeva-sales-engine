@@ -7,6 +7,7 @@ import {
 import type { FormEvent } from "react";
 
 import {
+  countCompanies,
   createCompany,
   listCompanies,
 } from "../features/companies/company.service";
@@ -31,7 +32,13 @@ function messageOf(
     : fallback;
 }
 
-export function CompaniesPage() {
+interface Props {
+  onOpenCompany: (id: number) => void;
+}
+
+const PAGE_SIZE = 50;
+
+export function CompaniesPage({ onOpenCompany }: Props) {
   const [companies, setCompanies] = useState<
     Company[]
   >([]);
@@ -46,6 +53,9 @@ export function CompaniesPage() {
 
   const [saving, setSaving] = useState(false);
 
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [total, setTotal] = useState(0);
+
   const [prospectingId, setProspectingId] =
     useState<number | null>(null);
 
@@ -55,9 +65,11 @@ export function CompaniesPage() {
     try {
       const [companyRows, prospectRows] =
         await Promise.all([
-          listCompanies(),
+          listCompanies(limit),
           listProspects(),
         ]);
+
+      setTotal(await countCompanies());
 
       setCompanies(companyRows);
 
@@ -72,7 +84,7 @@ export function CompaniesPage() {
         messageOf(err, "Erro ao carregar empresas."),
       );
     }
-  }, []);
+  }, [limit]);
 
   useEffect(() => {
     void load();
@@ -221,7 +233,7 @@ export function CompaniesPage() {
           </div>
 
           <span className="counter">
-            {companies.length} registros
+            {companies.length} de {total}
           </span>
         </div>
 
@@ -236,6 +248,7 @@ export function CompaniesPage() {
               <span>Segmento</span>
               <span>Cidade</span>
               <span>UF</span>
+              <span>Lead</span>
               <span>Ação</span>
             </div>
 
@@ -244,13 +257,20 @@ export function CompaniesPage() {
                 className="table-row"
                 key={company.id}
               >
-                <strong>{company.name}</strong>
+                <strong
+                  className="clickable"
+                  onClick={() => onOpenCompany(company.id)}
+                >
+                  {company.name}
+                </strong>
 
                 <span>{company.segment || "—"}</span>
 
                 <span>{company.city || "—"}</span>
 
                 <span>{company.state || "—"}</span>
+
+                <span>{company.lead_status}</span>
 
                 <div className="action-cell">
                   {prospectCompanyIds.has(
@@ -280,6 +300,15 @@ export function CompaniesPage() {
                 </div>
               </div>
             ))}
+            {companies.length < total && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setLimit((l) => l + PAGE_SIZE)}
+              >
+                Carregar mais
+              </button>
+            )}
           </div>
         )}
       </section>

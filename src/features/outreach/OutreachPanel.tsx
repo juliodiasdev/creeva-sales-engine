@@ -14,12 +14,16 @@ interface Props {
   onSent: (
     message: string,
   ) => Promise<void>;
+
+  /** Gera nova mensagem com IA (opcional). */
+  onGenerateAi?: () => Promise<string>;
 }
 
 export function OutreachPanel({
   draft,
   onCancel,
   onSent,
+  onGenerateAi,
 }: Props) {
   const [message, setMessage] =
     useState(draft.message);
@@ -29,6 +33,32 @@ export function OutreachPanel({
 
   const [sending, setSending] =
     useState(false);
+
+  const [generating, setGenerating] =
+    useState(false);
+
+  const [aiError, setAiError] =
+    useState("");
+
+  async function handleGenerate() {
+    if (!onGenerateAi) return;
+
+    setGenerating(true);
+    setAiError("");
+
+    try {
+      setMessage(await onGenerateAi());
+      setCopied(false);
+    } catch (err) {
+      setAiError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao gerar com IA.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function handleCopy() {
     await navigator.clipboard.writeText(
@@ -81,6 +111,17 @@ export function OutreachPanel({
             : "Marcar como enviado"}
         </button>
 
+        {onGenerateAi && (
+          <button
+            type="button"
+            className="secondary"
+            disabled={generating}
+            onClick={() => void handleGenerate()}
+          >
+            {generating ? "Gerando..." : "Gerar com IA"}
+          </button>
+        )}
+
         <button
           type="button"
           className="secondary"
@@ -89,6 +130,8 @@ export function OutreachPanel({
           Cancelar
         </button>
       </div>
+
+      {aiError && <p className="error">{aiError}</p>}
 
       <small>
         Envie manualmente (WhatsApp, e-mail ou DM) e

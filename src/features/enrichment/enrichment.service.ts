@@ -1,5 +1,6 @@
 import {
   getCompanyRepository,
+  listCompanyIdsByLeadStatusRepository,
   setLeadStatusRepository,
 } from "../companies/company.repository";
 
@@ -126,4 +127,22 @@ export async function disqualifyCompany(
     "DISQUALIFIED",
     reason.trim(),
   );
+}
+
+/** Enriquece até `limit` empresas ainda em DISCOVERED. */
+export async function startEnrichmentForDiscovered(
+  limit = 50,
+): Promise<number> {
+  const ids = await listCompanyIdsByLeadStatusRepository(
+    "DISCOVERED",
+    limit,
+  );
+
+  if (ids.length === 0) {
+    throw new Error(
+      "Nenhuma empresa descoberta aguardando enriquecimento.",
+    );
+  }
+
+  return startEnrichmentJob(ids);
 }

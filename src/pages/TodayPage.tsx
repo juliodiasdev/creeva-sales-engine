@@ -14,6 +14,7 @@ import type {
 
 import {
   markTaskAsSent,
+  prepareAiOutreach,
   prepareOutreach,
 } from "../features/outreach/outreach.service";
 
@@ -144,6 +145,9 @@ export function TodayPage({ onOpenProspect }: Props) {
               key={task.id}
               draft={draft}
               onCancel={() => setDraft(null)}
+              onGenerateAi={async () =>
+                (await prepareAiOutreach(task.id)).message
+              }
               onSent={(message) => handleSent(task.id, message)}
             />
           )}

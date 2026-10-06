@@ -234,3 +234,18 @@ export async function updateCompanyEnrichmentRepository(
     ],
   );
 }
+
+
+export async function listCompanyIdsByLeadStatusRepository(
+  status: LeadStatus,
+  limit: number,
+): Promise<number[]> {
+  const db = await getDatabase();
+
+  const rows = await db.select<{ id: number }[]>(
+    `SELECT id FROM companies WHERE lead_status = $1 ORDER BY id DESC LIMIT $2`,
+    [status, limit],
+  );
+
+  return rows.map((r) => r.id);
+}

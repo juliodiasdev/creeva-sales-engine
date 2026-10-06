@@ -5,6 +5,7 @@ export type PageId =
   | "companies"
   | "prospects"
   | "pipeline"
+  | "session"
   | "playbook"
   | "settings";
 
@@ -18,6 +19,7 @@ export const NAV_ITEMS: {
   { id: "companies", label: "Companies" },
   { id: "prospects", label: "Prospects" },
   { id: "pipeline", label: "Pipeline" },
+  { id: "session", label: "Sessão" },
   { id: "playbook", label: "Playbook" },
   { id: "settings", label: "Settings" },
 ];

@@ -13,11 +13,16 @@ import type {
   PageId,
 } from "./components/Sidebar";
 
-import { Placeholder } from "./components/Placeholder";
 
 import { TodayPage } from "./pages/TodayPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
 import { ProspectsPage } from "./pages/ProspectsPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { DiscoveryPage } from "./pages/DiscoveryPage";
+import { PlaybookPage } from "./pages/PlaybookPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { SessionPage } from "./pages/SessionPage";
+import { CompanyDetailPage } from "./pages/CompanyDetailPage";
 import { PipelinePage } from "./pages/PipelinePage";
 import { ProspectDetailPage } from "./pages/ProspectDetailPage";
 
@@ -25,51 +30,34 @@ import {
   initDatabase,
 } from "./lib/migrations";
 
-const PLACEHOLDERS: Partial<
-  Record<PageId, [string, string]>
-> = {
-  dashboard: [
-    "Dashboard",
-    "Métricas reais de funil, conversão e receita.",
-  ],
-  discovery: [
-    "Discovery",
-    "Busca de empresas por segmento e cidade.",
-  ],
-  playbook: [
-    "Playbook",
-    "Biblioteca de scripts por segmento.",
-  ],
-  settings: [
-    "Settings",
-    "Preferências e chaves de API.",
-  ],
-};
+import {
+  ensurePlaybookSeed,
+} from "./features/playbook/playbook.service";
 
 function renderPage(
   page: PageId,
   openProspect: (id: number) => void,
+  openCompany: (id: number) => void,
 ) {
   switch (page) {
     case "today":
       return <TodayPage onOpenProspect={openProspect} />;
+    case "dashboard":
+      return <DashboardPage />;
+    case "discovery":
+      return <DiscoveryPage />;
     case "companies":
-      return <CompaniesPage />;
+      return <CompaniesPage onOpenCompany={openCompany} />;
     case "prospects":
       return <ProspectsPage onOpenProspect={openProspect} />;
     case "pipeline":
       return <PipelinePage onOpenProspect={openProspect} />;
-    default: {
-      const [title, description] =
-        PLACEHOLDERS[page] ?? [page, ""];
-
-      return (
-        <Placeholder
-          title={title}
-          description={description}
-        />
-      );
-    }
+    case "session":
+      return <SessionPage onOpenProspect={openProspect} />;
+    case "playbook":
+      return <PlaybookPage />;
+    case "settings":
+      return <SettingsPage />;
   }
 }
 
@@ -80,12 +68,16 @@ function App() {
   const [prospectId, setProspectId] =
     useState<number | null>(null);
 
+  const [companyId, setCompanyId] =
+    useState<number | null>(null);
+
   const [ready, setReady] = useState(false);
 
   const [error, setError] = useState("");
 
   useEffect(() => {
     initDatabase()
+      .then(() => ensurePlaybookSeed())
       .then(() => setReady(true))
       .catch((err) => {
         console.error(err);
@@ -119,19 +111,30 @@ function App() {
         current={page}
         onNavigate={(next) => {
           setProspectId(null);
+          setCompanyId(null);
           setPage(next);
         }}
       />
 
       <main className="content">
-        {prospectId !== null ? (
+        {companyId !== null ? (
+          <CompanyDetailPage
+            key={companyId}
+            companyId={companyId}
+            onBack={() => setCompanyId(null)}
+            onOpenProspect={(id) => {
+              setCompanyId(null);
+              setProspectId(id);
+            }}
+          />
+        ) : prospectId !== null ? (
           <ProspectDetailPage
             key={prospectId}
             prospectId={prospectId}
             onBack={() => setProspectId(null)}
           />
         ) : (
-          renderPage(page, setProspectId)
+          renderPage(page, setProspectId, setCompanyId)
         )}
       </main>
     </div>

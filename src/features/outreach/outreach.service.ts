@@ -17,6 +17,19 @@ import {
   buildOutreachMessage,
 } from "./outreach.template";
 
+import {
+  findScript,
+  renderScript,
+} from "../playbook/playbook.service";
+
+import {
+  getSetting,
+} from "../settings/settings.service";
+
+import {
+  generateAiOutreach,
+} from "../ai/ai.service";
+
 import type {
   OutreachDraft,
 } from "./outreach.types";
@@ -30,9 +43,7 @@ const OUTREACH_TASK_TYPES = [
   "FOLLOW_UP",
 ];
 
-export async function prepareOutreach(
-  taskId: number,
-): Promise<OutreachDraft> {
+async function loadDraftContext(taskId: number) {
   const task = await getTaskRepository(
     taskId,
   );
@@ -60,17 +71,64 @@ export async function prepareOutreach(
     );
   }
 
+  return { task, prospect };
+}
+
+/** Mensagem do Playbook (segmento) ou template padrão. Sem IA. */
+export async function prepareOutreach(
+  taskId: number,
+): Promise<OutreachDraft> {
+  const { task, prospect } = await loadDraftContext(taskId);
+
+  const agency = (await getSetting("company_name")) ?? "Creava Digital";
+
+  const script = await findScript(
+    prospect.segment,
+    task.type === "FIRST_CONTACT"
+      ? "FIRST_CONTACT"
+      : task.title.toLowerCase().includes("proposta")
+        ? "PROPOSAL_FOLLOW_UP"
+        : "FOLLOW_UP_1",
+  );
+
   return {
     taskId,
     prospectId: prospect.id,
     taskType: task.type,
     companyName: prospect.company_name,
-    message: buildOutreachMessage({
-      taskType: task.type,
-      companyName: prospect.company_name,
-      segment: prospect.segment,
-      city: prospect.city,
-    }),
+    message: script
+      ? renderScript(script.body, {
+          empresa: prospect.company_name,
+          agencia: agency,
+          cidade: prospect.city,
+          vendedor: (await getSetting("seller_name")) ?? "",
+        })
+      : buildOutreachMessage({
+          taskType: task.type,
+          companyName: prospect.company_name,
+          segment: prospect.segment,
+          city: prospect.city,
+        }),
+  };
+}
+
+/** Mensagem gerada pela IA com base em evidências reais (usuário revisa). */
+export async function prepareAiOutreach(
+  taskId: number,
+): Promise<OutreachDraft> {
+  const { task, prospect } = await loadDraftContext(taskId);
+
+  const result = await generateAiOutreach(
+    prospect.company_id,
+    task.type === "FIRST_CONTACT" ? "FIRST_CONTACT" : "FOLLOW_UP",
+  );
+
+  return {
+    taskId,
+    prospectId: prospect.id,
+    taskType: task.type,
+    companyName: prospect.company_name,
+    message: result.message,
   };
 }
 
