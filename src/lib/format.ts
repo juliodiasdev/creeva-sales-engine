@@ -31,7 +31,10 @@ export function errorMessage(
   err: unknown,
   fallback: string,
 ): string {
-  return err instanceof Error
-    ? err.message
-    : fallback;
+  if (err instanceof Error) return err.message;
+
+  // tauri-plugin-sql rejeita com string, não com Error.
+  if (typeof err === "string" && err) return err;
+
+  return fallback;
 }

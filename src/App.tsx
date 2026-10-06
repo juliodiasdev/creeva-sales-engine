@@ -26,6 +26,8 @@ import { CompanyDetailPage } from "./pages/CompanyDetailPage";
 import { PipelinePage } from "./pages/PipelinePage";
 import { ProspectDetailPage } from "./pages/ProspectDetailPage";
 
+import { errorMessage } from "./lib/format";
+
 import {
   initDatabase,
 } from "./lib/migrations";
@@ -82,9 +84,7 @@ function App() {
       .catch((err) => {
         console.error(err);
         setError(
-          err instanceof Error
-            ? err.message
-            : "Erro ao inicializar o banco de dados.",
+          `Erro ao inicializar o banco de dados: ${errorMessage(err, "causa desconhecida")}`,
         );
       });
   }, []);

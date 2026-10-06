@@ -270,7 +270,20 @@ export async function runMigrations(
     if (applied.has(migration.version)) continue;
 
     for (const statement of migration.statements) {
-      await db.execute(statement);
+      try {
+        await db.execute(statement);
+      } catch (err) {
+        // Reexecução após falha parcial: o objeto já existe.
+        const text = String(
+          err instanceof Error ? err.message : err,
+        );
+
+        if (!/duplicate column name|already exists/i.test(text)) {
+          throw new Error(
+            `Migration ${migration.version} (${migration.name}) falhou: ${text}\nSQL: ${statement.slice(0, 120)}`,
+          );
+        }
+      }
     }
 
     // Registrada por último: se algo falhar no meio, a migration
