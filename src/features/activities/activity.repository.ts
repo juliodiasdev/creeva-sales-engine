@@ -10,6 +10,7 @@ export async function createActivityRepository(
   prospectId: number,
   type: ActivityType,
   content?: string,
+  channel?: string,
 ): Promise<void> {
   const db = await getDatabase();
 
@@ -18,19 +19,22 @@ export async function createActivityRepository(
       INSERT INTO activities (
         prospect_id,
         type,
-        content
+        content,
+        channel
       )
 
       VALUES (
         $1,
         $2,
-        $3
+        $3,
+        $4
       )
     `,
     [
       prospectId,
       type,
       content ?? null,
+      channel ?? null,
     ],
   );
 }

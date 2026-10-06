@@ -3,6 +3,7 @@ import {
 } from "../../lib/database";
 
 import type {
+  ProspectStatus,
   ProspectWithCompany,
 } from "./prospect.types";
 
@@ -75,4 +76,66 @@ export async function prospectExistsForCompanyRepository(
   );
 
   return rows[0]?.count > 0;
+}
+
+export async function getProspectContextRepository(
+  prospectId: number,
+): Promise<ProspectWithCompany | null> {
+  const db = await getDatabase();
+
+  const rows = await db.select<
+    ProspectWithCompany[]
+  >(
+    `
+      SELECT
+        p.*,
+
+        c.name AS company_name,
+        c.segment,
+        c.city,
+        c.state
+
+      FROM prospects p
+
+      INNER JOIN companies c
+        ON c.id = p.company_id
+
+      WHERE p.id = $1
+    `,
+    [prospectId],
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function updateProspectWorkflowRepository(
+  prospectId: number,
+  input: {
+    status?: ProspectStatus;
+    nextAction: string | null;
+    nextActionInDays?: number;
+  },
+): Promise<void> {
+  const db = await getDatabase();
+
+  await db.execute(
+    `
+      UPDATE prospects
+      SET
+        status = COALESCE($2, status),
+        next_action = $3,
+        next_action_at = CASE
+          WHEN $4 IS NULL THEN NULL
+          ELSE datetime('now', '+' || $4 || ' days')
+        END,
+        updated_at = datetime('now')
+      WHERE id = $1
+    `,
+    [
+      prospectId,
+      input.status ?? null,
+      input.nextAction,
+      input.nextActionInDays ?? null,
+    ],
+  );
 }

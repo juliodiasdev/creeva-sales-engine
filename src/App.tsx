@@ -36,6 +36,19 @@ import type {
 } from "./features/tasks/task.types";
 
 import {
+  markTaskAsSent,
+  prepareOutreach,
+} from "./features/outreach/outreach.service";
+
+import {
+  OutreachPanel,
+} from "./features/outreach/OutreachPanel";
+
+import type {
+  OutreachDraft,
+} from "./features/outreach/outreach.types";
+
+import {
   initDatabase,
 } from "./lib/migrations";
 
@@ -100,6 +113,13 @@ function App() {
     error,
     setError,
   ] = useState("");
+
+  const [
+    draft,
+    setDraft,
+  ] = useState<OutreachDraft | null>(
+    null,
+  );
 
   async function loadCompanies() {
     const data =
@@ -236,6 +256,55 @@ function App() {
     }
   }
 
+  async function handlePrepareOutreach(
+    taskId: number,
+  ) {
+    try {
+      setError("");
+
+      setDraft(
+        await prepareOutreach(taskId),
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao preparar abordagem.",
+      );
+    }
+  }
+
+  async function handleMarkSent(
+    taskId: number,
+    message: string,
+  ) {
+    try {
+      setError("");
+
+      await markTaskAsSent(
+        taskId,
+        message,
+      );
+
+      setDraft(null);
+
+      await Promise.all([
+        loadProspects(),
+        loadTasks(),
+      ]);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao registrar envio.",
+      );
+    }
+  }
+
   function companyIsProspect(
     companyId: number,
   ) {
@@ -350,7 +419,7 @@ function App() {
                   className="task-item"
                   key={task.id}
                 >
-                  <div>
+                  <div className="task-body">
                     <strong>
                       {
                         task.company_name
@@ -360,13 +429,52 @@ function App() {
                     <p>
                       {task.title}
                     </p>
+
+                    {draft?.taskId ===
+                      task.id && (
+                      <OutreachPanel
+                        key={task.id}
+                        draft={draft}
+                        onCancel={() =>
+                          setDraft(null)
+                        }
+                        onSent={(
+                          message,
+                        ) =>
+                          handleMarkSent(
+                            task.id,
+                            message,
+                          )
+                        }
+                      />
+                    )}
                   </div>
 
-                  <span className="status">
-                    {
-                      task.prospect_status
-                    }
-                  </span>
+                  <div className="task-actions">
+                    {(task.type ===
+                      "FIRST_CONTACT" ||
+                      task.type ===
+                        "FOLLOW_UP") &&
+                      draft?.taskId !==
+                        task.id && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handlePrepareOutreach(
+                              task.id,
+                            )
+                          }
+                        >
+                          Preparar abordagem
+                        </button>
+                      )}
+
+                    <span className="status">
+                      {
+                        task.prospect_status
+                      }
+                    </span>
+                  </div>
                 </article>
               ),
             )}

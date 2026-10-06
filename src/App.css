@@ -467,3 +467,44 @@ button:disabled {
       column;
   }
 }
+.outreach {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+}
+
+.outreach textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  background: inherit;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.outreach-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.outreach small {
+  opacity: 0.6;
+}
+
+.task-body {
+  flex: 1;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
