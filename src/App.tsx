@@ -3,597 +3,236 @@ import {
   useState,
 } from "react";
 
-import type {
-  FormEvent,
-} from "react";
-
 import "./App.css";
 
-import {
-  createCompany,
-  listCompanies,
-} from "./features/companies/company.service";
-
-import type {
-  Company,
-} from "./features/companies/company.types";
+import logo from "./assets/creava-logo.png";
 
 import {
-  createProspect,
-  listProspects,
-} from "./features/prospects/prospect.service";
+  NAV_ITEMS,
+  Sidebar,
+} from "./components/Sidebar";
 
 import type {
-  ProspectWithCompany,
-} from "./features/prospects/prospect.types";
+  PageId,
+} from "./components/Sidebar";
 
-import {
-  listPendingTasks,
-} from "./features/tasks/task.service";
 
-import type {
-  TaskWithProspect,
-} from "./features/tasks/task.types";
+import { TodayPage } from "./pages/TodayPage";
+import { CompaniesPage } from "./pages/CompaniesPage";
+import { ProspectsPage } from "./pages/ProspectsPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { DiscoveryPage } from "./pages/DiscoveryPage";
+import { PlaybookPage } from "./pages/PlaybookPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { SessionPage } from "./pages/SessionPage";
+import { CompanyDetailPage } from "./pages/CompanyDetailPage";
+import { PipelinePage } from "./pages/PipelinePage";
+import { ProspectDetailPage } from "./pages/ProspectDetailPage";
+
+import { errorMessage } from "./lib/format";
 
 import {
   initDatabase,
 } from "./lib/migrations";
 
+import {
+  ensurePlaybookSeed,
+} from "./features/playbook/playbook.service";
+
+function renderPage(
+  page: PageId,
+  openProspect: (id: number) => void,
+  openCompany: (id: number) => void,
+) {
+  switch (page) {
+    case "today":
+      return <TodayPage onOpenProspect={openProspect} />;
+    case "dashboard":
+      return <DashboardPage />;
+    case "discovery":
+      return <DiscoveryPage />;
+    case "companies":
+      return <CompaniesPage onOpenCompany={openCompany} />;
+    case "prospects":
+      return <ProspectsPage onOpenProspect={openProspect} />;
+    case "pipeline":
+      return <PipelinePage onOpenProspect={openProspect} />;
+    case "session":
+      return <SessionPage onOpenProspect={openProspect} />;
+    case "playbook":
+      return <PlaybookPage />;
+    case "settings":
+      return <SettingsPage />;
+  }
+}
+
 function App() {
-  const [
-    companies,
-    setCompanies,
-  ] = useState<Company[]>([]);
+  const [page, setPage] =
+    useState<PageId>("today");
 
-  const [
-    prospects,
-    setProspects,
-  ] = useState<
-    ProspectWithCompany[]
-  >([]);
+  const [prospectId, setProspectId] =
+    useState<number | null>(null);
 
-  const [
-    tasks,
-    setTasks,
-  ] = useState<
-    TaskWithProspect[]
-  >([]);
+  const [companyId, setCompanyId] =
+    useState<number | null>(null);
 
-  const [
-    name,
-    setName,
-  ] = useState("");
-
-  const [
-    segment,
-    setSegment,
-  ] = useState("");
-
-  const [
-    city,
-    setCity,
-  ] = useState("");
-
-  const [
-    state,
-    setState,
-  ] = useState("");
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-  const [
-    saving,
-    setSaving,
-  ] = useState(false);
-
-  const [
-    prospectingCompanyId,
-    setProspectingCompanyId,
-  ] = useState<number | null>(
-    null,
-  );
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-  async function loadCompanies() {
-    const data =
-      await listCompanies();
-
-    setCompanies(data);
-  }
-
-  async function loadProspects() {
-    const data =
-      await listProspects();
-
-    setProspects(data);
-  }
-
-  async function loadTasks() {
-    const data =
-      await listPendingTasks();
-
-    setTasks(data);
-  }
-
-  async function startApplication() {
+  const [collapsed, setCollapsed] = useState(() => {
     try {
-      setError("");
-
-      await initDatabase();
-
-      await Promise.all([
-        loadCompanies(),
-        loadProspects(),
-        loadTasks(),
-      ]);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao inicializar o banco de dados.",
-      );
-    } finally {
-      setLoading(false);
+      return localStorage.getItem("sidebar-collapsed") === "1";
+    } catch {
+      return false;
     }
+  });
+
+  const [ready, setReady] = useState(false);
+
+  function toggleSidebar() {
+    setCollapsed((value) => {
+      try {
+        localStorage.setItem("sidebar-collapsed", value ? "0" : "1");
+      } catch {
+        // armazenamento indisponível: só não persiste
+      }
+
+      return !value;
+    });
   }
 
+  function navigate(next: PageId) {
+    setProspectId(null);
+    setCompanyId(null);
+    setPage(next);
+  }
+
+  // Atalhos de teclado: Ctrl+1..9 navega, Ctrl+B recolhe o menu, Esc volta.
   useEffect(() => {
-    void startApplication();
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT";
+
+      if (event.ctrlKey && /^[1-9]$/.test(event.key)) {
+        const item = NAV_ITEMS[Number(event.key) - 1];
+
+        if (item) {
+          event.preventDefault();
+          navigate(item.id);
+        }
+      } else if (event.ctrlKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        toggleSidebar();
+      } else if (event.key === "Escape" && !typing) {
+        setProspectId(null);
+        setCompanyId(null);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () =>
+      window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
+  const [error, setError] = useState("");
 
-    if (!name.trim()) {
-      setError(
-        "Informe o nome da empresa.",
-      );
-
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError("");
-
-      await createCompany({
-        name:
-          name.trim(),
-
-        segment:
-          segment.trim() ||
-          undefined,
-
-        city:
-          city.trim() ||
-          undefined,
-
-        state:
-          state.trim() ||
-          undefined,
+  useEffect(() => {
+    initDatabase()
+      .then(() => ensurePlaybookSeed())
+      .then(() => setReady(true))
+      .catch((err) => {
+        console.error(err);
+        setError(
+          `Erro ao inicializar o banco de dados: ${errorMessage(err, "causa desconhecida")}`,
+        );
       });
+  }, []);
 
-      setName("");
-      setSegment("");
-      setCity("");
-      setState("");
-
-      await loadCompanies();
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao cadastrar empresa.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleCreateProspect(
-    companyId: number,
-  ) {
-    try {
-      setError("");
-
-      setProspectingCompanyId(
-        companyId,
-      );
-
-      await createProspect(
-        companyId,
-      );
-
-      await Promise.all([
-        loadProspects(),
-        loadTasks(),
-      ]);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao adicionar empresa à prospecção.",
-      );
-    } finally {
-      setProspectingCompanyId(
-        null,
-      );
-    }
-  }
-
-  function companyIsProspect(
-    companyId: number,
-  ) {
-    return prospects.some(
-      (prospect) =>
-        prospect.company_id ===
-        companyId,
-    );
-  }
-
-  if (loading) {
+  if (error) {
     return (
       <main className="app">
-        <p>
-          Inicializando Creava
-          Sales Engine...
-        </p>
+        <p className="error">{error}</p>
       </main>
     );
   }
 
+  if (!ready) {
+    return (
+      <main className="app">
+        <img className="loading-logo" src={logo} alt="Creava" />
+        <p>Inicializando Creava Sales Engine...</p>
+      </main>
+    );
+  }
+
+  const pageLabel =
+    NAV_ITEMS.find((item) => item.id === page)?.label ?? "";
+
+  const detail =
+    companyId !== null
+      ? "Empresa"
+      : prospectId !== null
+        ? "Prospect"
+        : null;
+
   return (
-    <main className="app">
-      <header className="header">
-        <div>
-          <span className="eyebrow">
-            CREAVA DIGITAL
-          </span>
+    <div className={collapsed ? "shell collapsed" : "shell"}>
+      <Sidebar
+        current={page}
+        collapsed={collapsed}
+        onNavigate={navigate}
+        onToggle={toggleSidebar}
+      />
 
-          <h1>
-            Sales Engine
-          </h1>
+      <div className="main">
+        <header className="topbar">
+          <h1>{pageLabel}</h1>
 
-          <p>
-            Motor local de
-            prospecção comercial.
-          </p>
-        </div>
-      </header>
+          {detail && (
+            <>
+              <span className="crumb">›</span>
+              <span className="crumb">{detail}</span>
+            </>
+          )}
+        </header>
 
-      <section className="metrics">
-        <article className="metric-card">
+        <main className="content">
+          {companyId !== null ? (
+            <CompanyDetailPage
+              key={companyId}
+              companyId={companyId}
+              onBack={() => setCompanyId(null)}
+              onOpenProspect={(id) => {
+                setCompanyId(null);
+                setProspectId(id);
+              }}
+            />
+          ) : prospectId !== null ? (
+            <ProspectDetailPage
+              key={prospectId}
+              prospectId={prospectId}
+              onBack={() => setProspectId(null)}
+            />
+          ) : (
+            renderPage(page, setProspectId, setCompanyId)
+          )}
+        </main>
+
+        <footer className="statusbar">
           <span>
-            Empresas
+            <span className="dot" />
+            Banco local (SQLite)
           </span>
 
-          <strong>
-            {companies.length}
-          </strong>
+          <span className="spacer" />
 
-          <small>
-            Cadastradas localmente
-          </small>
-        </article>
-
-        <article className="metric-card">
-          <span>
-            Prospects
+          <span className="hint">
+            Ctrl+1–9 navegar · Ctrl+B menu · Esc voltar
           </span>
-
-          <strong>
-            {prospects.length}
-          </strong>
-
-          <small>
-            Em prospecção
-          </small>
-        </article>
-
-        <article className="metric-card">
-          <span>
-            Ações pendentes
-          </span>
-
-          <strong>
-            {tasks.length}
-          </strong>
-
-          <small>
-            Para executar
-          </small>
-        </article>
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">
-          <div>
-            <span className="eyebrow">
-              TODAY
-            </span>
-
-            <h2>
-              Próximas ações
-            </h2>
-          </div>
-
-          <span className="counter">
-            {tasks.length} pendentes
-          </span>
-        </div>
-
-        {tasks.length === 0 ? (
-          <div className="empty">
-            Nenhuma ação
-            pendente.
-          </div>
-        ) : (
-          <div className="tasks-list">
-            {tasks.map(
-              (task) => (
-                <article
-                  className="task-item"
-                  key={task.id}
-                >
-                  <div>
-                    <strong>
-                      {
-                        task.company_name
-                      }
-                    </strong>
-
-                    <p>
-                      {task.title}
-                    </p>
-                  </div>
-
-                  <span className="status">
-                    {
-                      task.prospect_status
-                    }
-                  </span>
-                </article>
-              ),
-            )}
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">
-          <div>
-            <span className="eyebrow">
-              NOVA EMPRESA
-            </span>
-
-            <h2>
-              Cadastrar empresa
-            </h2>
-          </div>
-        </div>
-
-        <form
-          className="company-form"
-          onSubmit={handleSubmit}
-        >
-          <label>
-            Empresa
-
-            <input
-              value={name}
-              onChange={(
-                event,
-              ) =>
-                setName(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="Clínica Excellence"
-            />
-          </label>
-
-          <label>
-            Segmento
-
-            <input
-              value={segment}
-              onChange={(
-                event,
-              ) =>
-                setSegment(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="Odontologia"
-            />
-          </label>
-
-          <label>
-            Cidade
-
-            <input
-              value={city}
-              onChange={(
-                event,
-              ) =>
-                setCity(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="Cuiabá"
-            />
-          </label>
-
-          <label>
-            UF
-
-            <input
-              value={state}
-              onChange={(
-                event,
-              ) =>
-                setState(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="MT"
-              maxLength={2}
-            />
-          </label>
-
-          <button
-            type="submit"
-            disabled={saving}
-          >
-            {saving
-              ? "Salvando..."
-              : "Adicionar empresa"}
-          </button>
-        </form>
-
-        {error && (
-          <p className="error">
-            {error}
-          </p>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">
-          <div>
-            <span className="eyebrow">
-              DATABASE
-            </span>
-
-            <h2>
-              Empresas
-            </h2>
-          </div>
-
-          <span className="counter">
-            {companies.length} registros
-          </span>
-        </div>
-
-        {companies.length === 0 ? (
-          <div className="empty">
-            Nenhuma empresa
-            cadastrada.
-          </div>
-        ) : (
-          <div className="table">
-            <div className="table-row table-header">
-              <span>
-                Empresa
-              </span>
-
-              <span>
-                Segmento
-              </span>
-
-              <span>
-                Cidade
-              </span>
-
-              <span>
-                UF
-              </span>
-
-              <span>
-                Ação
-              </span>
-            </div>
-
-            {companies.map(
-              (company) => {
-                const isProspect =
-                  companyIsProspect(
-                    company.id,
-                  );
-
-                const isLoading =
-                  prospectingCompanyId ===
-                  company.id;
-
-                return (
-                  <div
-                    className="table-row"
-                    key={
-                      company.id
-                    }
-                  >
-                    <strong>
-                      {
-                        company.name
-                      }
-                    </strong>
-
-                    <span>
-                      {company.segment ||
-                        "—"}
-                    </span>
-
-                    <span>
-                      {company.city ||
-                        "—"}
-                    </span>
-
-                    <span>
-                      {company.state ||
-                        "—"}
-                    </span>
-
-                    <div className="action-cell">
-                      {isProspect ? (
-                        <span className="status">
-                          Em prospecção
-                        </span>
-                      ) : (
-                        <button
-                          className="prospect-button"
-                          type="button"
-                          disabled={
-                            isLoading
-                          }
-                          onClick={() =>
-                            void handleCreateProspect(
-                              company.id,
-                            )
-                          }
-                        >
-                          {isLoading
-                            ? "Adicionando..."
-                            : "Prospectar"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              },
-            )}
-          </div>
-        )}
-      </section>
-    </main>
+        </footer>
+      </div>
+    </div>
   );
 }
 

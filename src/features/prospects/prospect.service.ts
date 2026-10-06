@@ -1,8 +1,13 @@
 import {
   createProspectRepository,
+  getProspectContextRepository,
   listProspectsRepository,
   prospectExistsForCompanyRepository,
 } from "./prospect.repository";
+
+import {
+  setLeadStatusRepository,
+} from "../companies/company.repository";
 
 import {
   createTaskRepository,
@@ -49,9 +54,15 @@ export async function createProspect(
     "Empresa adicionada à prospecção.",
   );
 
+  await setLeadStatusRepository(companyId, "READY");
+
   return prospectId;
 }
 
 export function listProspects() {
   return listProspectsRepository();
+}
+
+export function getProspect(id: number) {
+  return getProspectContextRepository(id);
 }
