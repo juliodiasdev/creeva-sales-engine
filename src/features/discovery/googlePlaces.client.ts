@@ -68,10 +68,44 @@ export function placeToCompanyInput(
   };
 }
 
+/** Traduz a resposta de erro do Google em orientação acionável. */
+export async function describeGoogleError(
+  response: Response,
+): Promise<string> {
+  let detail = "";
+
+  try {
+    const body = (await response.json()) as {
+      error?: { message?: string; status?: string };
+    };
+
+    detail = body.error?.message ?? body.error?.status ?? "";
+  } catch {
+    // corpo não-JSON
+  }
+
+  const hint: Record<number, string> = {
+    400: "Requisição inválida (confira a chave).",
+    401: "Chave inválida ou ausente.",
+    403: 'Acesso negado: ative a "Places API (New)" no projeto, ative o faturamento e confira as restrições da chave.',
+    429: "Limite de uso/cota excedido.",
+  };
+
+  return `Google Places (${response.status}): ${hint[response.status] ?? "erro inesperado."}${detail ? ` Detalhe: ${detail}` : ""}`;
+}
+
+/** Faz uma busca mínima só para validar chave, API e faturamento. */
+export async function testGooglePlacesConnection(): Promise<string> {
+  const places = await searchPlaces("restaurante", "São Paulo", 1, 1);
+
+  return `Conexão OK: a API respondeu (${places.length} resultado de teste).`;
+}
+
 export async function searchPlaces(
   segment: string,
   city: string,
   maxPages = 1,
+  pageSize = 20,
 ): Promise<GooglePlace[]> {
   const apiKey = await getSetting("google_api_key");
 
@@ -96,7 +130,7 @@ export async function searchPlaces(
       body: JSON.stringify({
         textQuery: `${segment} em ${city}`,
         languageCode: "pt-BR",
-        pageSize: 20,
+        pageSize,
         ...(pageToken ? { pageToken } : {}),
       }),
     });
@@ -107,9 +141,7 @@ export async function searchPlaces(
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Google Places retornou ${response.status}.`,
-      );
+      throw new Error(await describeGoogleError(response));
     }
 
     const data = (await response.json()) as {

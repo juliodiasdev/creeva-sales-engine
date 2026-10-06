@@ -6,6 +6,7 @@ import {
 } from "../features/settings/settings.service";
 import type { SettingKey } from "../features/settings/settings.service";
 
+import { testGooglePlacesConnection } from "../features/discovery/googlePlaces.client";
 import { getApiUsageSummary } from "../features/jobs/apiUsage.service";
 
 import {
@@ -76,6 +77,17 @@ export function SettingsPage() {
       await load();
     } catch (err) {
       setError(errorMessage(err, "Erro ao salvar."));
+    }
+  }
+
+  async function handleTestGoogle() {
+    try {
+      setError("");
+      setMessage("Testando Google Places…");
+      setMessage(await testGooglePlacesConnection());
+    } catch (err) {
+      setMessage("");
+      setError(errorMessage(err, "Falha ao testar o Google Places."));
     }
   }
 
@@ -176,6 +188,17 @@ export function SettingsPage() {
               />
             </label>
           ))}
+        </div>
+
+        <div className="outreach-actions">
+          <button
+            type="button"
+            className="secondary"
+            disabled={!configured.google_api_key}
+            onClick={() => void handleTestGoogle()}
+          >
+            Testar Google Places
+          </button>
         </div>
 
         <p className="muted">
