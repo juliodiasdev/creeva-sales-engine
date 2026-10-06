@@ -25,6 +25,12 @@ import type {
   OutreachDraft,
 } from "../features/outreach/outreach.types";
 
+import {
+  completeTask,
+  rescheduleTask,
+  skipTask,
+} from "../features/workflow/workflow.service";
+
 import { ErrorMessage } from "../components/ErrorMessage";
 
 function messageOf(
@@ -36,7 +42,11 @@ function messageOf(
     : fallback;
 }
 
-export function TodayPage() {
+interface Props {
+  onOpenProspect: (id: number) => void;
+}
+
+export function TodayPage({ onOpenProspect }: Props) {
   const [tasks, setTasks] = useState<
     TaskWithProspect[]
   >([]);
@@ -98,6 +108,97 @@ export function TodayPage() {
     }
   }
 
+  async function act(action: () => Promise<void>) {
+    try {
+      setError("");
+      await action();
+      await loadTasks();
+    } catch (err) {
+      console.error(err);
+      setError(messageOf(err, "Erro ao atualizar tarefa."));
+    }
+  }
+
+  const overdue = tasks.filter((t) => t.is_overdue === 1);
+  const today = tasks.filter((t) => t.is_overdue !== 1);
+
+  function renderTask(task: TaskWithProspect) {
+    const hasOutreach =
+      task.type === "FIRST_CONTACT" ||
+      task.type === "FOLLOW_UP";
+
+    const isOpen = draft?.taskId === task.id;
+
+    return (
+      <article className="task-item" key={task.id}>
+        <div className="task-body">
+          <strong>{task.company_name}</strong>
+
+          <p>
+            {task.type} · {task.title}
+            {task.priority === "HIGH" ? " · ALTA" : ""}
+          </p>
+
+          {isOpen && draft && (
+            <OutreachPanel
+              key={task.id}
+              draft={draft}
+              onCancel={() => setDraft(null)}
+              onSent={(message) => handleSent(task.id, message)}
+            />
+          )}
+        </div>
+
+        <div className="task-actions">
+          {hasOutreach && !isOpen && (
+            <button type="button" onClick={() => void handlePrepare(task.id)}>
+              Preparar abordagem
+            </button>
+          )}
+
+          {!hasOutreach && (
+            <button
+              type="button"
+              onClick={() => void act(() => completeTask(task.id))}
+            >
+              Concluir
+            </button>
+          )}
+
+          <select
+            value=""
+            onChange={(e) =>
+              void act(() =>
+                rescheduleTask(task.id, Number(e.target.value)),
+              )
+            }
+          >
+            <option value="">Reagendar…</option>
+            <option value="1">+1 dia</option>
+            <option value="3">+3 dias</option>
+            <option value="7">+7 dias</option>
+          </select>
+
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => void act(() => skipTask(task.id))}
+          >
+            Pular
+          </button>
+
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => onOpenProspect(task.prospect_id)}
+          >
+            Abrir
+          </button>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <section className="panel">
       <div className="panel-title">
@@ -119,66 +220,29 @@ export function TodayPage() {
           Nenhuma ação pendente.
         </div>
       ) : (
-        <div className="tasks-list">
-          {tasks.map((task) => {
-            const hasOutreach =
-              task.type === "FIRST_CONTACT" ||
-              task.type === "FOLLOW_UP";
+        <>
+          {overdue.length > 0 && (
+            <>
+              <h3 className="group-title">
+                Atrasadas ({overdue.length})
+              </h3>
+              <div className="tasks-list">
+                {overdue.map(renderTask)}
+              </div>
+            </>
+          )}
 
-            const isOpen =
-              draft?.taskId === task.id;
-
-            return (
-              <article
-                className="task-item"
-                key={task.id}
-              >
-                <div className="task-body">
-                  <strong>
-                    {task.company_name}
-                  </strong>
-
-                  <p>{task.title}</p>
-
-                  {isOpen && draft && (
-                    <OutreachPanel
-                      key={task.id}
-                      draft={draft}
-                      onCancel={() =>
-                        setDraft(null)
-                      }
-                      onSent={(message) =>
-                        handleSent(
-                          task.id,
-                          message,
-                        )
-                      }
-                    />
-                  )}
-                </div>
-
-                <div className="task-actions">
-                  {hasOutreach && !isOpen && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void handlePrepare(
-                          task.id,
-                        )
-                      }
-                    >
-                      Preparar abordagem
-                    </button>
-                  )}
-
-                  <span className="status">
-                    {task.prospect_status}
-                  </span>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+          {today.length > 0 && (
+            <>
+              <h3 className="group-title">
+                Hoje ({today.length})
+              </h3>
+              <div className="tasks-list">
+                {today.map(renderTask)}
+              </div>
+            </>
+          )}
+        </>
       )}
     </section>
   );

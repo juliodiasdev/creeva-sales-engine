@@ -11,6 +11,11 @@ export type TaskType =
   | "PROPOSAL"
   | "OTHER";
 
+export type TaskOutcome =
+  | "DONE"
+  | "SKIPPED"
+  | "CANCELED";
+
 export interface Task {
   id: number;
 
@@ -25,6 +30,7 @@ export interface Task {
 
   due_at: string | null;
   completed_at: string | null;
+  outcome: TaskOutcome | null;
 
   created_at: string;
 }
@@ -34,4 +40,9 @@ export interface TaskWithProspect
   company_name: string;
 
   prospect_status: string;
+
+  prospect_score: number;
+
+  /** 1 quando due_at é de um dia anterior ao de hoje. */
+  is_overdue: number;
 }

@@ -4,6 +4,8 @@ import {
 
 import type {
   Task,
+  TaskOutcome,
+  TaskPriority,
   TaskType,
   TaskWithProspect,
 } from "./task.types";
@@ -13,6 +15,7 @@ export async function createTaskRepository(
   type: TaskType,
   title: string,
   dueInDays?: number,
+  priority: TaskPriority = "NORMAL",
 ): Promise<void> {
   const db = await getDatabase();
 
@@ -23,6 +26,7 @@ export async function createTaskRepository(
         prospect_id,
         type,
         title,
+        priority,
         due_at
       )
 
@@ -30,6 +34,7 @@ export async function createTaskRepository(
         $1,
         $2,
         $3,
+        $5,
         CASE
           WHEN $4 IS NULL THEN NULL
           ELSE datetime('now', '+' || $4 || ' days')
@@ -41,6 +46,7 @@ export async function createTaskRepository(
       type,
       title,
       dueInDays ?? null,
+      priority,
     ],
   );
 }
@@ -58,28 +64,98 @@ export async function getTaskRepository(
   return rows[0] ?? null;
 }
 
+export async function listTasksByProspectRepository(
+  prospectId: number,
+): Promise<Task[]> {
+  const db = await getDatabase();
+
+  return db.select<Task[]>(
+    `
+      SELECT *
+      FROM tasks
+      WHERE prospect_id = $1
+      ORDER BY
+        completed_at IS NOT NULL,
+        due_at ASC,
+        id ASC
+    `,
+    [prospectId],
+  );
+}
+
 /**
- * Conclui a task somente se ainda estiver aberta.
- * Retorna false quando já havia sido concluída (evita duplo envio).
+ * Fecha a task somente se ainda estiver aberta.
+ * Retorna false quando já havia sido fechada (evita duplo envio).
  */
 export async function completeTaskRepository(
   taskId: number,
+  outcome: TaskOutcome = "DONE",
 ): Promise<boolean> {
   const db = await getDatabase();
 
   const result = await db.execute(
     `
       UPDATE tasks
-      SET completed_at = datetime('now')
+      SET completed_at = datetime('now'),
+          outcome = $2
       WHERE id = $1
         AND completed_at IS NULL
     `,
-    [taskId],
+    [taskId, outcome],
   );
 
   return result.rowsAffected > 0;
 }
 
+/** Cancela tasks abertas do prospect (ex.: respondeu, ganhou, perdeu). */
+export async function cancelOpenTasksRepository(
+  prospectId: number,
+  types?: TaskType[],
+): Promise<void> {
+  const db = await getDatabase();
+
+  const filter = types?.length
+    ? `AND type IN (${types
+        .map((_, i) => `$${i + 2}`)
+        .join(", ")})`
+    : "";
+
+  await db.execute(
+    `
+      UPDATE tasks
+      SET completed_at = datetime('now'),
+          outcome = 'CANCELED'
+      WHERE prospect_id = $1
+        AND completed_at IS NULL
+        ${filter}
+    `,
+    [prospectId, ...(types ?? [])],
+  );
+}
+
+export async function rescheduleTaskRepository(
+  taskId: number,
+  days: number,
+): Promise<boolean> {
+  const db = await getDatabase();
+
+  const result = await db.execute(
+    `
+      UPDATE tasks
+      SET due_at = datetime('now', '+' || $2 || ' days')
+      WHERE id = $1
+        AND completed_at IS NULL
+    `,
+    [taskId, days],
+  );
+
+  return result.rowsAffected > 0;
+}
+
+/**
+ * Today: abertas, sem data ou já vencidas.
+ * Ordem: atrasadas, prioridade, score, mais antigas.
+ */
 export async function listPendingTasksRepository():
 Promise<TaskWithProspect[]> {
   const db = await getDatabase();
@@ -90,7 +166,15 @@ Promise<TaskWithProspect[]> {
 
       c.name AS company_name,
 
-      p.status AS prospect_status
+      p.status AS prospect_status,
+
+      p.score AS prospect_score,
+
+      CASE
+        WHEN t.due_at IS NOT NULL
+         AND date(t.due_at) < date('now')
+        THEN 1 ELSE 0
+      END AS is_overdue
 
     FROM tasks t
 
@@ -107,13 +191,17 @@ Promise<TaskWithProspect[]> {
       )
 
     ORDER BY
+      is_overdue DESC,
+
       CASE
         WHEN t.priority = 'HIGH' THEN 1
         WHEN t.priority = 'NORMAL' THEN 2
         ELSE 3
       END,
 
-      t.due_at ASC,
+      p.score DESC,
+
+      t.created_at ASC,
 
       t.id ASC
   `);

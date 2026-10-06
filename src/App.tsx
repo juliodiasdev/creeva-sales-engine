@@ -18,6 +18,8 @@ import { Placeholder } from "./components/Placeholder";
 import { TodayPage } from "./pages/TodayPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
 import { ProspectsPage } from "./pages/ProspectsPage";
+import { PipelinePage } from "./pages/PipelinePage";
+import { ProspectDetailPage } from "./pages/ProspectDetailPage";
 
 import {
   initDatabase,
@@ -34,10 +36,6 @@ const PLACEHOLDERS: Partial<
     "Discovery",
     "Busca de empresas por segmento e cidade.",
   ],
-  pipeline: [
-    "Pipeline",
-    "Visão do funil por estágio comercial.",
-  ],
   playbook: [
     "Playbook",
     "Biblioteca de scripts por segmento.",
@@ -48,14 +46,19 @@ const PLACEHOLDERS: Partial<
   ],
 };
 
-function renderPage(page: PageId) {
+function renderPage(
+  page: PageId,
+  openProspect: (id: number) => void,
+) {
   switch (page) {
     case "today":
-      return <TodayPage />;
+      return <TodayPage onOpenProspect={openProspect} />;
     case "companies":
       return <CompaniesPage />;
     case "prospects":
-      return <ProspectsPage />;
+      return <ProspectsPage onOpenProspect={openProspect} />;
+    case "pipeline":
+      return <PipelinePage onOpenProspect={openProspect} />;
     default: {
       const [title, description] =
         PLACEHOLDERS[page] ?? [page, ""];
@@ -73,6 +76,9 @@ function renderPage(page: PageId) {
 function App() {
   const [page, setPage] =
     useState<PageId>("today");
+
+  const [prospectId, setProspectId] =
+    useState<number | null>(null);
 
   const [ready, setReady] = useState(false);
 
@@ -111,11 +117,22 @@ function App() {
     <div className="shell">
       <Sidebar
         current={page}
-        onNavigate={setPage}
+        onNavigate={(next) => {
+          setProspectId(null);
+          setPage(next);
+        }}
       />
 
       <main className="content">
-        {renderPage(page)}
+        {prospectId !== null ? (
+          <ProspectDetailPage
+            key={prospectId}
+            prospectId={prospectId}
+            onBack={() => setProspectId(null)}
+          />
+        ) : (
+          renderPage(page, setProspectId)
+        )}
       </main>
     </div>
   );

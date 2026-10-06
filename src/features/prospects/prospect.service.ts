@@ -1,5 +1,6 @@
 import {
   createProspectRepository,
+  getProspectContextRepository,
   listProspectsRepository,
   prospectExistsForCompanyRepository,
 } from "./prospect.repository";
@@ -54,4 +55,8 @@ export async function createProspect(
 
 export function listProspects() {
   return listProspectsRepository();
+}
+
+export function getProspect(id: number) {
+  return getProspectContextRepository(id);
 }

@@ -46,7 +46,10 @@ Promise<ProspectWithCompany[]> {
       c.name AS company_name,
       c.segment,
       c.city,
-      c.state
+      c.state,
+      c.website,
+      c.phone,
+      c.instagram
 
     FROM prospects p
 
@@ -93,7 +96,10 @@ export async function getProspectContextRepository(
         c.name AS company_name,
         c.segment,
         c.city,
-        c.state
+        c.state,
+        c.website,
+        c.phone,
+        c.instagram
 
       FROM prospects p
 
@@ -114,6 +120,9 @@ export async function updateProspectWorkflowRepository(
     status?: ProspectStatus;
     nextAction: string | null;
     nextActionInDays?: number;
+    lostReason?: string | null;
+    /** true: grava closed_at agora; false: limpa (reabertura). */
+    closed?: boolean;
   },
 ): Promise<void> {
   const db = await getDatabase();
@@ -128,6 +137,16 @@ export async function updateProspectWorkflowRepository(
           WHEN $4 IS NULL THEN NULL
           ELSE datetime('now', '+' || $4 || ' days')
         END,
+        lost_reason = CASE
+          WHEN $6 = 1 THEN $5
+          WHEN $6 = 0 THEN NULL
+          ELSE lost_reason
+        END,
+        closed_at = CASE
+          WHEN $6 = 1 THEN datetime('now')
+          WHEN $6 = 0 THEN NULL
+          ELSE closed_at
+        END,
         updated_at = datetime('now')
       WHERE id = $1
     `,
@@ -136,6 +155,12 @@ export async function updateProspectWorkflowRepository(
       input.status ?? null,
       input.nextAction,
       input.nextActionInDays ?? null,
+      input.lostReason ?? null,
+      input.closed === undefined
+        ? null
+        : input.closed
+          ? 1
+          : 0,
     ],
   );
 }

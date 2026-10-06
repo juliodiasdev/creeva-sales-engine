@@ -13,7 +13,11 @@ import type {
 
 import { ErrorMessage } from "../components/ErrorMessage";
 
-export function ProspectsPage() {
+interface Props {
+  onOpenProspect: (id: number) => void;
+}
+
+export function ProspectsPage({ onOpenProspect }: Props) {
   const [prospects, setProspects] = useState<
     ProspectWithCompany[]
   >([]);
@@ -55,8 +59,9 @@ export function ProspectsPage() {
         <div className="tasks-list">
           {prospects.map((prospect) => (
             <article
-              className="task-item"
+              className="task-item clickable"
               key={prospect.id}
+              onClick={() => onOpenProspect(prospect.id)}
             >
               <div className="task-body">
                 <strong>

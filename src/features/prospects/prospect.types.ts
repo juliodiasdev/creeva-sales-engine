@@ -31,6 +31,9 @@ export interface Prospect {
 
   qualification_notes: string | null;
 
+  lost_reason: string | null;
+  closed_at: string | null;
+
   created_at: string;
   updated_at: string;
 }
@@ -40,4 +43,7 @@ export interface ProspectWithCompany extends Prospect {
   segment: string | null;
   city: string | null;
   state: string | null;
+  website: string | null;
+  phone: string | null;
+  instagram: string | null;
 }

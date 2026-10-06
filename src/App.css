@@ -559,3 +559,106 @@ button:disabled {
   flex-direction: column;
   gap: 24px;
 }
+
+select {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #27272a;
+  background: #18181b;
+  color: inherit;
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid #3f3f46;
+  color: #d4d4d8;
+}
+
+.muted {
+  color: #a1a1aa;
+}
+
+.group-title {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.task-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+  color: #d4d4d8;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 2px solid #27272a;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.timeline p {
+  margin: 4px 0 0;
+  color: #a1a1aa;
+  white-space: pre-wrap;
+}
+
+.pipeline {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+}
+
+.pipeline-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pipeline-column h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.pipeline-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  background: #111113;
+}
+
+.outreach input,
+.outreach label {
+  font: inherit;
+}
+
+.outreach input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #27272a;
+  background: #18181b;
+  color: inherit;
+}
