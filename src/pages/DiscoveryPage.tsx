@@ -74,7 +74,7 @@ export function DiscoveryPage() {
           Resultados viram Companies (com deduplicação), nunca Prospects automaticamente.
         </p>
 
-        <form className="company-form" onSubmit={handleSearch}>
+        <form className="discovery-form" onSubmit={handleSearch}>
           <label>
             Segmento
             <input value={segment} onChange={(e) => setSegment(e.target.value)} placeholder="Odontologia" />

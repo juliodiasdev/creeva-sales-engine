@@ -874,3 +874,20 @@ textarea:focus {
 .pipeline-column h3 small {
   color: var(--muted);
 }
+
+.discovery-form {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.discovery-form button {
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .discovery-form {
+    grid-template-columns: 1fr;
+  }
+}
