@@ -5,6 +5,8 @@ import {
 
 import "./App.css";
 
+import logo from "./assets/creava-logo.png";
+
 import {
   Sidebar,
 } from "./components/Sidebar";
@@ -100,6 +102,7 @@ function App() {
   if (!ready) {
     return (
       <main className="app">
+        <img className="loading-logo" src={logo} alt="Creava" />
         <p>Inicializando Creava Sales Engine...</p>
       </main>
     );

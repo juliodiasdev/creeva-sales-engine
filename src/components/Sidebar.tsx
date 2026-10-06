@@ -1,3 +1,5 @@
+import logo from "../assets/creava-logo.png";
+
 export type PageId =
   | "today"
   | "dashboard"
@@ -36,11 +38,15 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="eyebrow">
-          CREAVA DIGITAL
-        </span>
+        <img src={logo} alt="Creava" />
 
-        <strong>Sales Engine</strong>
+        <div className="brand-text">
+          <strong>CREAVA</strong>
+
+          <span className="eyebrow">
+            SALES ENGINE
+          </span>
+        </div>
       </div>
 
       <nav>
