@@ -14,6 +14,12 @@ import {
   importBackup,
 } from "../features/backup/backup.service";
 
+import {
+  clearApiKeys,
+  clearBusinessData,
+  resetEverything,
+} from "../features/backup/reset.service";
+
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
 
@@ -34,6 +40,31 @@ const SECRETS: [SettingKey, string][] = [
   ["openai_api_key", "OpenAI API key"],
 ];
 
+type DangerAction = "keys" | "data" | "all";
+
+const DANGER: Record<
+  DangerAction,
+  { label: string; description: string; run: () => Promise<void> }
+> = {
+  keys: {
+    label: "Remover chaves de API",
+    description: "Apaga as chaves do Google e da OpenAI. Os dados são mantidos.",
+    run: clearApiKeys,
+  },
+  data: {
+    label: "Apagar dados de teste",
+    description:
+      "Apaga empresas, prospects, tarefas, histórico, jobs e uso de APIs. Mantém configurações, chaves e playbook.",
+    run: clearBusinessData,
+  },
+  all: {
+    label: "Resetar tudo",
+    description:
+      "Apaga dados, configurações, chaves e restaura o playbook padrão. O app volta ao estado inicial.",
+    run: resetEverything,
+  },
+};
+
 export function SettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [configured, setConfigured] = useState<Record<string, boolean>>({});
@@ -41,6 +72,8 @@ export function SettingsPage() {
   const [usage, setUsage] = useState<
     { provider: string; requests: number; tokens: number; estimated_cost: number }[]
   >([]);
+  const [danger, setDanger] = useState<DangerAction | null>(null);
+  const [confirmText, setConfirmText] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -88,6 +121,22 @@ export function SettingsPage() {
     } catch (err) {
       setMessage("");
       setError(errorMessage(err, "Falha ao testar o Google Places."));
+    }
+  }
+
+  async function runDanger() {
+    if (!danger || confirmText !== "APAGAR") return;
+
+    try {
+      setError("");
+      await DANGER[danger].run();
+      setMessage(`${DANGER[danger].label}: concluído.`);
+      setDanger(null);
+      setConfirmText("");
+      setSecretInputs({});
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Erro ao limpar."));
     }
   }
 
@@ -256,6 +305,69 @@ export function SettingsPage() {
             />
           </label>
         </div>
+      </section>
+
+      <section className="panel danger-zone">
+        <div className="panel-title">
+          <div>
+            <span className="eyebrow">ZONA DE PERIGO</span>
+            <h2>Limpar para novos testes</h2>
+          </div>
+        </div>
+
+        <div className="tasks-list">
+          {(Object.keys(DANGER) as DangerAction[]).map((key) => (
+            <article className="task-item" key={key}>
+              <div className="task-body">
+                <strong>{DANGER[key].label}</strong>
+                <p>{DANGER[key].description}</p>
+              </div>
+
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setDanger(key);
+                  setConfirmText("");
+                }}
+              >
+                {DANGER[key].label}
+              </button>
+            </article>
+          ))}
+        </div>
+
+        {danger && (
+          <div className="outreach">
+            <strong>{DANGER[danger].label}</strong>
+            <p className="muted">
+              Esta ação não pode ser desfeita. Digite <b>APAGAR</b> para confirmar.
+            </p>
+            <input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="APAGAR"
+              autoFocus
+            />
+            <div className="outreach-actions">
+              <button
+                type="button"
+                className="danger"
+                disabled={confirmText !== "APAGAR"}
+                onClick={() => void runDanger()}
+              >
+                Confirmar
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setDanger(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </>
   );

@@ -782,3 +782,12 @@ strong.clickable:hover { color: var(--accent); }
 
   .statusbar .hint { display: none; }
 }
+
+.danger-zone { border-color: rgba(255, 123, 123, 0.35); }
+.danger-zone .eyebrow { color: var(--danger); }
+
+button.danger {
+  background: var(--danger);
+  color: #1b1b1b;
+}
+button.danger:hover { background: #ff9a9a; }

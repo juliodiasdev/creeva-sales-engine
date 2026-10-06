@@ -79,3 +79,36 @@ describe("playbook", () => {
     expect((await findScript("Padaria", "FIRST_CONTACT"))?.segment).toBe("serviços locais");
   });
 });
+
+import { clearApiKeys, clearBusinessData, resetEverything } from "../backup/reset.service";
+
+describe("reset", () => {
+  it("clears keys only, then business data, then everything", async () => {
+    await prospect("A");
+    await setSetting("openai_api_key", "sk-x");
+    await setSetting("seller_name", "Júlio");
+    await ensurePlaybookSeed();
+
+    const count = async (t: string) =>
+      (await db.select<{ n: number }[]>(`SELECT COUNT(*) n FROM ${t}`))[0].n;
+
+    await clearApiKeys();
+    expect(await count("settings")).toBe(1);
+    expect(await count("companies")).toBe(1);
+
+    await clearBusinessData();
+    for (const t of ["companies", "prospects", "tasks", "activities", "jobs"]) {
+      expect(await count(t)).toBe(0);
+    }
+    expect(await count("settings")).toBe(1);
+
+    await prospect("B");
+    const [{ id }] = await db.select<{ id: number }[]>("SELECT id FROM companies");
+    expect(id).toBe(1); // contador de ids reiniciado
+
+    await resetEverything();
+    expect(await count("settings")).toBe(0);
+    expect(await count("companies")).toBe(0);
+    expect(await count("playbook_scripts")).toBeGreaterThan(0);
+  });
+});
