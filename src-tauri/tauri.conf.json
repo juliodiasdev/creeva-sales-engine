@@ -41,7 +41,15 @@
       "nsis": {
         "languages": [
           "PortugueseBR"
-        ]
+        ],
+        "installerIcon": "icons/icon.ico",
+        "sidebarImage": "installer/nsis-sidebar.bmp",
+        "headerImage": "installer/nsis-header.bmp"
+      },
+      "wix": {
+        "language": "pt-BR",
+        "bannerPath": "installer/wix-banner.bmp",
+        "dialogImagePath": "installer/wix-dialog.bmp"
       }
     }
   }
