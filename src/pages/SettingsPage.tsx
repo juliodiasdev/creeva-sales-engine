@@ -25,6 +25,12 @@ import {
   resetEverything,
 } from "../features/backup/reset.service";
 
+import {
+  listServices,
+  updateService,
+} from "../features/services/services.service";
+import type { Service } from "../features/services/services.service";
+
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
 
@@ -77,6 +83,7 @@ export function SettingsPage() {
   const [usage, setUsage] = useState<
     { provider: string; requests: number; tokens: number; estimated_cost: number }[]
   >([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [diag, setDiag] = useState<DiagnosticStep[]>([]);
   const [diagRunning, setDiagRunning] = useState(false);
   const [danger, setDanger] = useState<DangerAction | null>(null);
@@ -90,6 +97,7 @@ export function SettingsPage() {
       setValues(s.values);
       setConfigured(s.configured);
       setUsage(await getApiUsageSummary());
+      setServices(await listServices());
     } catch (err) {
       setError(errorMessage(err, "Erro ao carregar configurações."));
     }
@@ -146,6 +154,24 @@ export function SettingsPage() {
       setError(errorMessage(err, "Erro ao limpar."));
     }
   }
+
+  async function saveService(service: Service) {
+    try {
+      setError("");
+      await updateService(service.id, {
+        name: service.name,
+        description: service.description,
+        pain_points: service.pain_points,
+        active: service.active,
+      });
+      setMessage(`Serviço "${service.name}" salvo.`);
+    } catch (err) {
+      setError(errorMessage(err, "Erro ao salvar serviço."));
+    }
+  }
+
+  const editService = (id: number, patch: Partial<Service>) =>
+    setServices((list) => list.map((x) => (x.id === id ? { ...x, ...patch } : x)));
 
   async function handleDiagnostics() {
     setDiagRunning(true);
@@ -348,6 +374,56 @@ export function SettingsPage() {
               onChange={(e) => void handleImport(e.target.files?.[0])}
             />
           </label>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-title">
+          <div>
+            <span className="eyebrow">CATÁLOGO</span>
+            <h2>Serviços da Creava</h2>
+            <p className="muted">
+              É o que a análise (e a IA) usa para sugerir como vender. Desative
+              o que você não quer oferecer.
+            </p>
+          </div>
+        </div>
+
+        <div className="tasks-list">
+          {services.map((svc) => (
+            <article className="task-item service-edit" key={svc.id}>
+              <div className="task-body">
+                <label className="check inline">
+                  <input
+                    type="checkbox"
+                    checked={svc.active === 1}
+                    onChange={(e) => editService(svc.id, { active: e.target.checked ? 1 : 0 })}
+                  />
+                  <span><strong>Oferecer</strong></span>
+                </label>
+
+                <input
+                  value={svc.name}
+                  onChange={(e) => editService(svc.id, { name: e.target.value })}
+                />
+                <textarea
+                  rows={2}
+                  value={svc.description}
+                  onChange={(e) => editService(svc.id, { description: e.target.value })}
+                />
+                <textarea
+                  rows={2}
+                  placeholder="Dores que resolve (ajuda a IA)"
+                  value={svc.pain_points ?? ""}
+                  onChange={(e) => editService(svc.id, { pain_points: e.target.value })}
+                />
+              </div>
+
+              <button type="button" onClick={() => void saveService(svc)}>
+                Salvar
+              </button>
+            </article>
+          ))}
         </div>
       </section>
 

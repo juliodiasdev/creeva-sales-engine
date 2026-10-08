@@ -14,9 +14,17 @@ import { openaiChatJson } from "./openai.client";
 import type { ChatJson } from "./openai.client";
 
 import {
-  validateAnalysis,
   validateOutreach,
+  validatePlan,
 } from "./ai.validation";
+
+import { listChannelsRepository } from "../contacts/channels.repository";
+import { replaceApproachesRepository } from "../contacts/approaches.repository";
+import { APPROACH_CHANNELS } from "../contacts/approaches.engine";
+import type { Approach } from "../contacts/approaches.engine";
+import { matchServices } from "../services/offers.engine";
+import { listServices } from "../services/services.service";
+import type { ServiceKey } from "../services/services.service";
 
 import type {
   AiAnalysisResult,
@@ -27,10 +35,12 @@ export interface StoredAnalysis extends AiAnalysisResult {
   id: number;
   company_id: number;
   model: string | null;
+  /** JSON: [{ service_key, reason, pitch }] */
+  recommended_services: string | null;
   created_at: string;
 }
 
-const SYSTEM_RULES = `Você é um analista comercial da agência Creava Digital (sites, presença digital e geração de clientes).
+const SYSTEM_RULES = `Você é um analista comercial da agência Creava Digital. A Creava NÃO vende apenas sites: vende o catálogo de serviços informado (landing pages, sites e lojas, softwares e aplicativos, sistemas e automações, suporte contínuo).
 Regras obrigatórias:
 - Use SOMENTE os fatos, sinais e evidências fornecidos no JSON. Nunca invente dados.
 - Se a evidência for insuficiente, diga isso e use confiança baixa.
@@ -90,37 +100,92 @@ async function buildContext(companyId: number) {
   };
 }
 
-export async function analyzeCompany(
+/**
+ * UMA chamada de IA por empresa: análise + serviços recomendados +
+ * abordagens por canal. Tudo é validado contra o catálogo, os canais
+ * reais e os sinais existentes antes de salvar.
+ */
+export async function planCompanyWithAi(
   companyId: number,
   chat: ChatJson = openaiChatJson,
 ): Promise<StoredAnalysis> {
-  const { context } = await buildContext(companyId);
+  const { context, signals } = await buildContext(companyId);
+
+  const [services, channels, company] = await Promise.all([
+    listServices(true),
+    listChannelsRepository(companyId),
+    getCompanyRepository(companyId),
+  ]);
+
+  const channelKinds = [
+    ...new Set(channels.map((c) => c.kind as string)),
+  ].filter((k) => (APPROACH_CHANNELS as string[]).includes(k));
+
+  const hints = matchServices({
+    company: company!,
+    signals,
+    facts: null,
+    activeKeys: services.map((s) => s.key as ServiceKey),
+  });
+
+  const seller = (await getSetting("seller_name")) ?? "";
+  const agency = (await getSetting("company_name")) ?? "Creava Digital";
 
   const { json, model } = await chat([
     { role: "system", content: SYSTEM_RULES },
     {
       role: "user",
-      content: `Analise a empresa e responda com as chaves: summary, main_problem, opportunity, recommended_offer, outreach_angle (strings) e confidence (número de 0 a 1).\n${JSON.stringify(context)}`,
+      content: `Analise a empresa e ajude a decidir COMO vender os serviços da ${agency}${seller ? ` (vendedor: ${seller})` : ""}.
+Responda JSON com:
+- summary, main_problem, opportunity, recommended_offer, outreach_angle (strings) e confidence (0 a 1);
+- recommended_services: lista de {"service_key", "reason", "pitch"} usando SOMENTE chaves do catálogo e razões baseadas nos dados;
+- approaches: até 3 abordagens {"channel", "service_key", "angle", "message", "evidence_used"}. channel deve estar em ${JSON.stringify(channelKinds)}; message curta (máx. 600 caracteres), tom humano, sem links; evidence_used lista APENAS tipos de sinal que existem nos dados (lista vazia se nenhum).
+Só afirme problemas que correspondam a um sinal listado.
+Catálogo: ${JSON.stringify(services.map((s) => ({ service_key: s.key, nome: s.name, descricao: s.description, dores: s.pain_points })))}
+Sugestões determinísticas (podem ajudar): ${JSON.stringify(hints.map((h) => ({ service_key: h.key, motivos: h.reasons })))}
+Dados: ${JSON.stringify(context)}`,
     },
   ]);
 
-  const analysis = validateAnalysis(json);
+  const plan = validatePlan(json, {
+    serviceKeys: services.map((s) => s.key),
+    channels: channelKinds,
+    signalTypes: signals.map((s) => s.type),
+  });
 
   unwrap(
     await getSupabase().from("ai_analyses").insert({
       company_id: companyId,
-      summary: analysis.summary,
-      main_problem: analysis.main_problem,
-      opportunity: analysis.opportunity,
-      recommended_offer: analysis.recommended_offer,
-      outreach_angle: analysis.outreach_angle,
-      confidence: analysis.confidence,
+      summary: plan.analysis.summary,
+      main_problem: plan.analysis.main_problem,
+      opportunity: plan.analysis.opportunity,
+      recommended_offer: plan.analysis.recommended_offer,
+      outreach_angle: plan.analysis.outreach_angle,
+      confidence: plan.analysis.confidence,
       model,
+      recommended_services: JSON.stringify(plan.services),
     }),
+  );
+
+  await replaceApproachesRepository(
+    companyId,
+    "AI",
+    plan.approaches.map(
+      (a): Approach => ({
+        channel: a.channel as Approach["channel"],
+        service_key: a.service_key as ServiceKey | null,
+        angle: a.angle,
+        message: a.message,
+        evidence_used: a.evidence_used as Approach["evidence_used"],
+      }),
+    ),
   );
 
   return (await getLatestAnalysis(companyId))!;
 }
+
+/** Compatibilidade: a "análise" agora já inclui serviços e abordagens. */
+export const analyzeCompany = planCompanyWithAi;
 
 export async function getLatestAnalysis(
   companyId: number,

@@ -1,11 +1,13 @@
 import { getSupabase } from "./supabase";
 import { ensurePlaybookSeed } from "../features/playbook/playbook.service";
+import { ensureServicesSeed } from "../features/services/services.service";
 
 /** Verifica se o schema existe e prepara dados iniciais. */
 export async function initApp(): Promise<void> {
+  // "services" existe só a partir do schema v2: serve de marcador de versão.
   const { error } = await getSupabase()
-    .from("settings")
-    .select("key")
+    .from("services")
+    .select("id")
     .limit(1);
 
   if (error) {
@@ -16,10 +18,11 @@ export async function initApp(): Promise<void> {
 
     throw new Error(
       missing
-        ? "O banco ainda não foi preparado: execute o arquivo supabase/schema.sql no SQL Editor do Supabase."
+        ? "O banco precisa ser criado/atualizado: execute o arquivo supabase/schema.sql no SQL Editor do Supabase (pode rodar de novo, é seguro)."
         : error.message,
     );
   }
 
   await ensurePlaybookSeed();
+  await ensureServicesSeed();
 }

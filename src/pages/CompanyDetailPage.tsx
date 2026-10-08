@@ -12,10 +12,7 @@ import type {
   StoredSignal,
 } from "../features/enrichment/enrichment.repository";
 
-import {
-  disqualifyCompany,
-  enrichCompany,
-} from "../features/enrichment/enrichment.service";
+import { disqualifyCompany } from "../features/enrichment/enrichment.service";
 import { enrichCompanyWithCnpj } from "../features/enrichment/cnpj.service";
 import type { ScoreReason } from "../features/scoring/scoring.engine";
 
@@ -26,6 +23,23 @@ import {
 import type { StoredAnalysis } from "../features/ai/ai.service";
 
 import { createProspect } from "../features/prospects/prospect.service";
+
+import { ChannelButtons } from "../features/contacts/ChannelButtons";
+import { listChannelsRepository } from "../features/contacts/channels.repository";
+import type { StoredChannel } from "../features/contacts/channels.repository";
+import { listApproachesRepository } from "../features/contacts/approaches.repository";
+import type { StoredApproach } from "../features/contacts/approaches.repository";
+import { channelOpenUrl, CHANNEL_LABEL } from "../features/contacts/channels.engine";
+import type { ChannelKind } from "../features/contacts/channels.engine";
+
+import { matchServices } from "../features/services/offers.engine";
+import { listServices } from "../features/services/services.service";
+import type { Service, ServiceKey } from "../features/services/services.service";
+import { getLatestSnapshotRepository } from "../features/enrichment/enrichment.repository";
+
+import { EnrichDialog } from "../features/enrichment/EnrichDialog";
+import { ConfirmButton } from "../components/ConfirmButton";
+import { openExternal } from "../lib/opener";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
@@ -41,6 +55,12 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
   const [signals, setSignals] = useState<StoredSignal[]>([]);
   const [score, setScore] = useState<StoredScore | null>(null);
   const [analysis, setAnalysis] = useState<StoredAnalysis | null>(null);
+  const [channels, setChannels] = useState<StoredChannel[]>([]);
+  const [approaches, setApproaches] = useState<StoredApproach[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [matches, setMatches] = useState<ReturnType<typeof matchServices>>([]);
+  const [enriching, setEnriching] = useState(false);
+  const [copied, setCopied] = useState<number | null>(null);
   const [cnpj, setCnpj] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState("");
@@ -48,16 +68,33 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
 
   const load = useCallback(async () => {
     try {
-      const [c, s, sc, a] = await Promise.all([
+      const [c, s, sc, a, ch, ap, svc, facts] = await Promise.all([
         getCompanyRepository(companyId),
         listSignalsRepository(companyId),
         getLatestScoreRepository(companyId),
         getLatestAnalysis(companyId),
+        listChannelsRepository(companyId),
+        listApproachesRepository(companyId),
+        listServices(true),
+        getLatestSnapshotRepository(companyId),
       ]);
       setCompany(c);
       setSignals(s);
       setScore(sc);
       setAnalysis(a);
+      setChannels(ch);
+      setApproaches(ap);
+      setServices(svc);
+      setMatches(
+        c
+          ? matchServices({
+              company: c,
+              signals: s,
+              facts,
+              activeKeys: svc.map((x) => x.key as ServiceKey),
+            })
+          : [],
+      );
     } catch (err) {
       setError(errorMessage(err, "Erro ao carregar empresa."));
     }
@@ -123,13 +160,19 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
         <ErrorMessage message={error} />
 
         <div className="outreach-actions">
-          <button type="button" disabled={!!busy} onClick={() => void run("enrich", () => enrichCompany(companyId))}>
-            {busy === "enrich" ? "Enriquecendo..." : "Enriquecer (site + score)"}
+          <button type="button" disabled={!!busy} onClick={() => setEnriching(true)}>
+            Enriquecer…
           </button>
 
-          <button type="button" disabled={!!busy} onClick={() => void run("ai", () => analyzeCompany(companyId))}>
-            {busy === "ai" ? "Analisando..." : "Analisar com IA"}
-          </button>
+          <ConfirmButton
+            secondary
+            disabled={!!busy}
+            warning="Usa a OpenAI (1 chamada, centavos). Continuar?"
+            confirmLabel="Gerar plano com IA"
+            onConfirm={() => void run("ai", () => analyzeCompany(companyId))}
+          >
+            {busy === "ai" ? "Gerando plano…" : "Gerar plano com IA"}
+          </ConfirmButton>
 
           {company.lead_status !== "READY" && (
             <button
@@ -178,6 +221,160 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
             >
               Desqualificar
             </button>
+          </div>
+        )}
+      </section>
+
+      {enriching && (
+        <EnrichDialog
+          companyIds={[companyId]}
+          onClose={() => setEnriching(false)}
+          onStarted={() => {
+            setEnriching(false);
+            setError("");
+            window.setTimeout(() => void load(), 4000);
+          }}
+        />
+      )}
+
+      <section className="panel">
+        <div className="panel-title">
+          <h2>Contatos ({channels.length})</h2>
+        </div>
+
+        <ChannelButtons
+          channels={channels}
+          message={
+            (approaches.find((a) => a.channel === "WHATSAPP" && a.source === "AI") ??
+              approaches.find((a) => a.channel === "WHATSAPP"))?.message
+          }
+          subject={`Contato — ${company.name}`}
+        />
+
+        {channels.length > 0 && (
+          <ul className="reasons">
+            {channels.map((ch) => (
+              <li key={ch.id}>
+                <strong>{CHANNEL_LABEL[ch.kind]}</strong> — {ch.value}{" "}
+                <small>
+                  ({ch.label ? `${ch.label}; ` : ""}fonte: {ch.source})
+                </small>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {channels.length === 0 && (
+          <p className="muted">
+            Nenhum canal ainda. Use "Enriquecer…" para ler o site e coletar
+            e-mails e redes sociais.
+          </p>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-title">
+          <h2>Como vender (serviços sugeridos)</h2>
+        </div>
+
+        {matches.length === 0 ? (
+          <p className="muted">
+            Sem evidência suficiente para sugerir um serviço. Rode
+            "Enriquecer…" (com análise) ou gere o plano com IA.
+          </p>
+        ) : (
+          <div className="tasks-list">
+            {matches.map((m) => (
+              <article className="task-item" key={m.key}>
+                <div className="task-body">
+                  <strong>
+                    {services.find((s) => s.key === m.key)?.name ?? m.key}
+                  </strong>
+                  <ul className="reasons">
+                    {m.reasons.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+                <span className="status">afinidade {m.score}</span>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {analysis?.recommended_services && (
+          <>
+            <h3 className="group-title">Sugestões da IA</h3>
+            <ul className="reasons">
+              {(JSON.parse(analysis.recommended_services) as { service_key: string; reason: string; pitch: string }[]).map(
+                (r, i) => (
+                  <li key={i}>
+                    <strong>{services.find((s) => s.key === r.service_key)?.name ?? r.service_key}</strong>
+                    {" — "}
+                    {r.reason}
+                    {r.pitch ? ` · Pitch: ${r.pitch}` : ""}
+                  </li>
+                ),
+              )}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-title">
+          <h2>Abordagens ({approaches.length})</h2>
+        </div>
+
+        {approaches.length === 0 ? (
+          <p className="muted">
+            Nenhuma abordagem ainda. "Enriquecer…" gera modelos por canal sem
+            IA; "Gerar plano com IA" cria versões personalizadas.
+          </p>
+        ) : (
+          <div className="tasks-list">
+            {approaches.map((ap) => {
+              const channel = channels.find((c) => c.kind === ap.channel);
+
+              return (
+                <article className="task-item approach" key={ap.id}>
+                  <div className="task-body">
+                    <p>
+                      <span className="status">{CHANNEL_LABEL[ap.channel as ChannelKind] ?? ap.channel}</span>{" "}
+                      <span className="status">{ap.source === "AI" ? "IA" : "modelo"}</span>{" "}
+                      <small>{ap.angle}</small>
+                    </p>
+                    <p className="script-body">{ap.message}</p>
+                  </div>
+
+                  <div className="task-actions">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(ap.message);
+                        setCopied(ap.id);
+                      }}
+                    >
+                      {copied === ap.id ? "Copiado ✓" : "Copiar"}
+                    </button>
+
+                    {channel && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void openExternal(
+                            channelOpenUrl(channel, ap.message, `Contato — ${company.name}`),
+                          )
+                        }
+                      >
+                        Abrir no {CHANNEL_LABEL[channel.kind]}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

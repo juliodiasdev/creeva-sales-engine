@@ -19,6 +19,7 @@ import type {
 
 import { TodayPage } from "./pages/TodayPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
+import { ContactsPage } from "./pages/ContactsPage";
 import { ProspectsPage } from "./pages/ProspectsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DiscoveryPage } from "./pages/DiscoveryPage";
@@ -52,6 +53,8 @@ function renderPage(
       return <DiscoveryPage />;
     case "companies":
       return <CompaniesPage onOpenCompany={openCompany} />;
+    case "contacts":
+      return <ContactsPage onOpenCompany={openCompany} />;
     case "prospects":
       return <ProspectsPage onOpenProspect={openProspect} />;
     case "pipeline":
@@ -117,8 +120,8 @@ function App() {
         target?.tagName === "TEXTAREA" ||
         target?.tagName === "SELECT";
 
-      if (event.ctrlKey && /^[1-9]$/.test(event.key)) {
-        const item = NAV_ITEMS[Number(event.key) - 1];
+      if (event.ctrlKey && /^[0-9]$/.test(event.key)) {
+        const item = NAV_ITEMS[(Number(event.key) + 9) % 10];
 
         if (item) {
           event.preventDefault();
@@ -296,7 +299,7 @@ function App() {
           <span className="spacer" />
 
           <span className="hint">
-            Ctrl+1–9 navegar · Ctrl+B menu · Esc voltar
+            Ctrl+1–0 navegar · Ctrl+B menu · Esc voltar
           </span>
         </footer>
       </div>

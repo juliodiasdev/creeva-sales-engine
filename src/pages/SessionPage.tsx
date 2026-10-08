@@ -11,6 +11,7 @@ import {
 
 import { changeProspectStatus } from "../features/workflow/workflow.service";
 
+import { ChannelButtons } from "../features/contacts/ChannelButtons";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
 
@@ -131,6 +132,17 @@ export function SessionPage({ onOpenProspect }: Props) {
             setCopied(false);
           }}
         />
+
+        {item.draft.channels.length > 0 && (
+          <div>
+            <small>Abrir com a mensagem pronta:</small>
+            <ChannelButtons
+              channels={item.draft.channels}
+              message={message}
+              subject={`Contato — ${task.company_name}`}
+            />
+          </div>
+        )}
 
         <div className="outreach-actions">
           <button

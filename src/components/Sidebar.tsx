@@ -7,6 +7,7 @@ export type PageId =
   | "dashboard"
   | "discovery"
   | "companies"
+  | "contacts"
   | "prospects"
   | "pipeline"
   | "session"
@@ -38,6 +39,12 @@ const ICONS: Record<PageId, ReactNode> = {
     <>
       <rect x="4" y="3" width="10" height="18" />
       <path d="M14 9h6v12h-6M8 7h2M8 11h2M8 15h2" />
+    </>
+  ),
+  contacts: (
+    <>
+      <path d="M4 5h16v14H4z" />
+      <path d="M8 10h8M8 14h5" />
     </>
   ),
   prospects: (
@@ -82,6 +89,7 @@ export const NAV_ITEMS: {
   { id: "dashboard", label: "Dashboard" },
   { id: "discovery", label: "Discovery" },
   { id: "companies", label: "Companies" },
+  { id: "contacts", label: "Contatos" },
   { id: "prospects", label: "Prospects" },
   { id: "pipeline", label: "Pipeline" },
   { id: "session", label: "Sessão" },
@@ -125,7 +133,7 @@ export function Sidebar({
           <button
             key={item.id}
             type="button"
-            title={`${item.label} (Ctrl+${index + 1})`}
+            title={`${item.label} (Ctrl+${(index + 1) % 10})`}
             className={
               item.id === current
                 ? "nav-item active"
@@ -142,7 +150,7 @@ export function Sidebar({
             </span>
 
             <span className="kbd">
-              ^{index + 1}
+              ^{(index + 1) % 10}
             </span>
           </button>
         ))}

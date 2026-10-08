@@ -77,6 +77,7 @@ class Query implements PromiseLike<unknown> {
   private countHead = false;
   private wantCount = false;
   private conflict: string | null = null;
+  private ignoreDup = false;
 
   constructor(
     private db: DatabaseSync,
@@ -98,9 +99,13 @@ class Query implements PromiseLike<unknown> {
     return this;
   }
 
-  upsert(rows: object | object[], opts?: { onConflict?: string }) {
+  upsert(
+    rows: object | object[],
+    opts?: { onConflict?: string; ignoreDuplicates?: boolean },
+  ) {
     this.op = "upsert";
     this.conflict = opts?.onConflict ?? null;
+    this.ignoreDup = !!opts?.ignoreDuplicates;
     this.payload = ([] as object[]).concat(rows) as Record<string, unknown>[];
     return this;
   }
@@ -202,11 +207,18 @@ class Query implements PromiseLike<unknown> {
             : `INSERT INTO ${t} DEFAULT VALUES`;
 
           if (this.op === "upsert" && this.conflict) {
-            const updates = keys
-              .filter((k) => k !== this.conflict)
-              .map((k) => `${ident(k)} = excluded.${ident(k)}`)
-              .join(",");
-            sql += ` ON CONFLICT(${ident(this.conflict)}) DO UPDATE SET ${updates || `${ident(this.conflict)} = excluded.${ident(this.conflict)}`}`;
+            const cols = this.conflict.split(",").map((c) => c.trim());
+            const target = cols.map(ident).join(",");
+
+            if (this.ignoreDup) {
+              sql += ` ON CONFLICT(${target}) DO NOTHING`;
+            } else {
+              const updates = keys
+                .filter((k) => !cols.includes(k))
+                .map((k) => `${ident(k)} = excluded.${ident(k)}`)
+                .join(",");
+              sql += ` ON CONFLICT(${target}) DO UPDATE SET ${updates || `${ident(cols[0])} = excluded.${ident(cols[0])}`}`;
+            }
           }
 
           sql += " RETURNING *";

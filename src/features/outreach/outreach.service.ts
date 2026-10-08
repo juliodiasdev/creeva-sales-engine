@@ -30,6 +30,10 @@ import {
   generateAiOutreach,
 } from "../ai/ai.service";
 
+import {
+  listChannelsRepository,
+} from "../contacts/channels.repository";
+
 import type {
   OutreachDraft,
 } from "./outreach.types";
@@ -96,6 +100,7 @@ export async function prepareOutreach(
     prospectId: prospect.id,
     taskType: task.type,
     companyName: prospect.company_name,
+    channels: await listChannelsRepository(prospect.company_id),
     message: script
       ? renderScript(script.body, {
           empresa: prospect.company_name,
@@ -128,6 +133,7 @@ export async function prepareAiOutreach(
     prospectId: prospect.id,
     taskType: task.type,
     companyName: prospect.company_name,
+    channels: await listChannelsRepository(prospect.company_id),
     message: result.message,
   };
 }

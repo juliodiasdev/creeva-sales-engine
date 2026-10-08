@@ -14,6 +14,7 @@ import {
 import type { Company } from "../companies/company.types";
 import { createActivityRepository } from "../activities/activity.repository";
 
+import { markPlaceSeen } from "../discovery/discovery.repository";
 import { openaiChatJson } from "../ai/openai.client";
 import type { ChatJson } from "../ai/openai.client";
 
@@ -236,6 +237,12 @@ export async function mergeCompanies(
     );
 
     prospectsMerged = true;
+  }
+
+  // O lugar do Google do duplicado fica registrado para sempre,
+  // apontando para o principal: nunca será coletado de novo.
+  if (dup.google_place_id) {
+    await markPlaceSeen(dup.google_place_id, masterId);
   }
 
   // 3) remove o duplicado (libera campos únicos: place id, CNPJ)
