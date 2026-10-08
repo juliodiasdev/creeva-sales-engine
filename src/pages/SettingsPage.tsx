@@ -329,6 +329,11 @@ export function SettingsPage() {
           <h2>Backup</h2>
         </div>
 
+        <p className="muted">
+          Para trazer os dados do app antigo (versão local), exporte o backup
+          nele e importe aqui.
+        </p>
+
         <div className="outreach-actions">
           <button type="button" onClick={() => void handleExport()}>
             Exportar backup (JSON)

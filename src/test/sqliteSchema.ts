@@ -1,5 +1,4 @@
-import { getDatabase } from "./database";
-import type { Db } from "./database";
+import type { Db } from "./dbTypes";
 
 interface Migration {
   version: number;
@@ -27,8 +26,8 @@ export const MIGRATIONS: Migration[] = [
         phone TEXT,
         instagram TEXT,
         google_place_id TEXT,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
       )`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_google_place_id
         ON companies(google_place_id) WHERE google_place_id IS NOT NULL`,
@@ -42,8 +41,8 @@ export const MIGRATIONS: Migration[] = [
         next_action TEXT,
         next_action_at DATETIME,
         qualification_notes TEXT,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS tasks (
@@ -55,7 +54,7 @@ export const MIGRATIONS: Migration[] = [
         priority TEXT NOT NULL DEFAULT 'NORMAL',
         due_at DATETIME,
         completed_at DATETIME,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS activities (
@@ -65,7 +64,7 @@ export const MIGRATIONS: Migration[] = [
         channel TEXT,
         content TEXT,
         metadata TEXT,
-        occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        occurred_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
       )`,
       `CREATE INDEX IF NOT EXISTS idx_prospects_status ON prospects(status)`,
@@ -93,8 +92,8 @@ export const MIGRATIONS: Migration[] = [
         closed_at DATETIME,
         recurring INTEGER NOT NULL DEFAULT 0,
         lost_reason TEXT,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
       )`,
       `CREATE INDEX idx_deals_prospect_id ON deals(prospect_id)`,
@@ -108,7 +107,7 @@ export const MIGRATIONS: Migration[] = [
         budget TEXT,
         decision_maker TEXT,
         timeline TEXT,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE proposals (
@@ -117,9 +116,9 @@ export const MIGRATIONS: Migration[] = [
         prospect_id INTEGER NOT NULL,
         value REAL NOT NULL,
         description TEXT,
-        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        sent_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         valid_until DATETIME,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE CASCADE,
         FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
       )`,
@@ -156,7 +155,7 @@ export const MIGRATIONS: Migration[] = [
         source_type TEXT NOT NULL,
         source_id TEXT,
         raw_data TEXT,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
       )`,
       `CREATE INDEX idx_company_sources_company ON company_sources(company_id)`,
@@ -165,7 +164,7 @@ export const MIGRATIONS: Migration[] = [
         company_id INTEGER NOT NULL,
         url TEXT NOT NULL,
         facts TEXT NOT NULL,
-        fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        fetched_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
       )`,
       `CREATE INDEX idx_snapshots_company ON website_snapshots(company_id)`,
@@ -177,7 +176,7 @@ export const MIGRATIONS: Migration[] = [
         evidence TEXT NOT NULL,
         source TEXT NOT NULL,
         confidence REAL NOT NULL DEFAULT 1,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
       )`,
       `CREATE INDEX idx_signals_company ON signals(company_id)`,
@@ -191,7 +190,7 @@ export const MIGRATIONS: Migration[] = [
         total INTEGER NOT NULL,
         confidence REAL NOT NULL,
         reasons TEXT NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
       )`,
       `CREATE INDEX idx_scores_company ON company_scores(company_id)`,
@@ -205,7 +204,7 @@ export const MIGRATIONS: Migration[] = [
         outreach_angle TEXT NOT NULL,
         confidence REAL NOT NULL,
         model TEXT,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
       )`,
       `CREATE INDEX idx_ai_company ON ai_analyses(company_id)`,
@@ -216,7 +215,7 @@ export const MIGRATIONS: Migration[] = [
         progress INTEGER NOT NULL DEFAULT 0,
         error TEXT,
         result TEXT,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         started_at DATETIME,
         finished_at DATETIME
       )`,
@@ -227,12 +226,12 @@ export const MIGRATIONS: Migration[] = [
         requests INTEGER NOT NULL DEFAULT 1,
         tokens INTEGER NOT NULL DEFAULT 0,
         estimated_cost REAL NOT NULL DEFAULT 0,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
       )`,
       `CREATE TABLE settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
       )`,
       `CREATE TABLE playbook_scripts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -240,7 +239,7 @@ export const MIGRATIONS: Migration[] = [
         kind TEXT NOT NULL,
         title TEXT NOT NULL,
         body TEXT NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
       )`,
     ],
   },
@@ -254,7 +253,7 @@ export async function runMigrations(
     `CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
-      applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      applied_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     )`,
   );
 
@@ -293,8 +292,4 @@ export async function runMigrations(
       [migration.version, migration.name],
     );
   }
-}
-
-export async function initDatabase(): Promise<void> {
-  await runMigrations(await getDatabase());
 }

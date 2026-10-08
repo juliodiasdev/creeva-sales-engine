@@ -1,4 +1,4 @@
-import { getDatabase } from "../../lib/database";
+import { getSupabase, nowIso, unwrap } from "../../lib/store";
 
 export type JobStatus =
   | "PENDING"
@@ -20,6 +20,10 @@ export interface Job {
 
 export type ReportProgress = (percent: number) => Promise<void>;
 
+async function patch(id: number, values: Record<string, unknown>) {
+  unwrap(await getSupabase().from("jobs").update(values).eq("id", id));
+}
+
 /**
  * Executa uma operação longa registrando o ciclo de vida em `jobs`.
  * Retorna o id imediatamente; o trabalho segue assíncrono para não
@@ -29,41 +33,38 @@ export async function startJob<T>(
   type: string,
   work: (report: ReportProgress) => Promise<T>,
 ): Promise<number> {
-  const db = await getDatabase();
+  const created = unwrap(
+    await getSupabase()
+      .from("jobs")
+      .insert({ type })
+      .select("id")
+      .single(),
+  ) as { id: number };
 
-  const created = await db.execute(
-    `INSERT INTO jobs (type) VALUES ($1)`,
-    [type],
-  );
-
-  const id = Number(created.lastInsertId);
+  const id = Number(created.id);
 
   void (async () => {
     try {
-      await db.execute(
-        `UPDATE jobs SET status='RUNNING', started_at=datetime('now') WHERE id=$1`,
-        [id],
-      );
+      await patch(id, { status: "RUNNING", started_at: nowIso() });
 
       const result = await work(async (percent) => {
-        await db.execute(
-          `UPDATE jobs SET progress=$2 WHERE id=$1`,
-          [id, Math.max(0, Math.min(100, Math.round(percent)))],
-        );
+        await patch(id, {
+          progress: Math.max(0, Math.min(100, Math.round(percent))),
+        });
       });
 
-      await db.execute(
-        `UPDATE jobs SET status='COMPLETED', progress=100, result=$2, finished_at=datetime('now') WHERE id=$1`,
-        [id, JSON.stringify(result ?? null)],
-      );
+      await patch(id, {
+        status: "COMPLETED",
+        progress: 100,
+        result: JSON.stringify(result ?? null),
+        finished_at: nowIso(),
+      });
     } catch (err) {
-      await db.execute(
-        `UPDATE jobs SET status='FAILED', error=$2, finished_at=datetime('now') WHERE id=$1`,
-        [
-          id,
-          err instanceof Error ? err.message : String(err),
-        ],
-      );
+      await patch(id, {
+        status: "FAILED",
+        error: err instanceof Error ? err.message : String(err),
+        finished_at: nowIso(),
+      });
     }
   })();
 
@@ -71,21 +72,21 @@ export async function startJob<T>(
 }
 
 export async function listJobs(limit = 20): Promise<Job[]> {
-  const db = await getDatabase();
-
-  return db.select<Job[]>(
-    `SELECT * FROM jobs ORDER BY id DESC LIMIT $1`,
-    [limit],
-  );
+  return unwrap(
+    await getSupabase()
+      .from("jobs")
+      .select("*")
+      .order("id", { ascending: false })
+      .limit(limit),
+  ) as Job[];
 }
 
 export async function getJob(id: number): Promise<Job | null> {
-  const db = await getDatabase();
-
-  const rows = await db.select<Job[]>(
-    `SELECT * FROM jobs WHERE id = $1`,
-    [id],
-  );
-
-  return rows[0] ?? null;
+  return unwrap(
+    await getSupabase()
+      .from("jobs")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle(),
+  ) as Job | null;
 }

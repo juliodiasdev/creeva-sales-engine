@@ -36,6 +36,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Públicos por design (a proteção é o login + RLS). Opcionais:
+          # sem eles o app pede a conexão na primeira execução.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseName: "Creava Sales Engine ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"

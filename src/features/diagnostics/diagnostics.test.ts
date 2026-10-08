@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMigratedTestDb } from "../../test/testDb";
-import type { Db } from "../../lib/database";
+import type { Db } from "../../test/dbTypes";
 
 let db: Db;
-vi.mock("../../lib/database", () => ({ getDatabase: async () => db }));
+vi.mock("../../lib/supabase", async () => {
+  const { testClient } = await import("../../test/testDb");
+  return { getSupabase: () => testClient() };
+});
 
 const httpFetch = vi.fn();
 vi.mock("../../lib/http", () => ({ httpFetch: (...a: unknown[]) => httpFetch(...a) }));
@@ -50,6 +53,6 @@ describe("diagnostics", () => {
     expect(by("Chave OpenAI configurada").status).toBe("FALHOU");
     expect(by("OpenAI (conexão)").status).toBe("PULADO");
     expect(by("Análise com IA").status).toBe("PULADO");
-    expect(by("Banco de dados").status).toBe("OK");
+    expect(by("Banco de dados (nuvem)").status).toBe("OK");
   });
 });

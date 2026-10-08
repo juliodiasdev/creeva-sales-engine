@@ -1,4 +1,4 @@
-import { getDatabase } from "../../lib/database";
+import { getSupabase, unwrap } from "../../lib/store";
 
 import { importCompany } from "../companies/company.service";
 import { testGooglePlacesConnection } from "../discovery/googlePlaces.client";
@@ -22,7 +22,7 @@ function messageOf(err: unknown): string {
 
 /** Remove o que o diagnóstico criou, sem depender de cascade de FK. */
 async function cleanup(companyId: number): Promise<void> {
-  const db = await getDatabase();
+  const supabase = getSupabase();
 
   for (const table of [
     "ai_analyses",
@@ -31,10 +31,10 @@ async function cleanup(companyId: number): Promise<void> {
     "website_snapshots",
     "company_sources",
   ]) {
-    await db.execute(`DELETE FROM ${table} WHERE company_id = $1`, [companyId]);
+    unwrap(await supabase.from(table).delete().eq("company_id", companyId));
   }
 
-  await db.execute(`DELETE FROM companies WHERE id = $1`, [companyId]);
+  unwrap(await supabase.from("companies").delete().eq("id", companyId));
 }
 
 /**
@@ -77,18 +77,23 @@ export async function runDiagnostics(
   }
 
   await run(
-    "Banco de dados",
+    "Banco de dados (nuvem)",
     async () => {
-      const db = await getDatabase();
-      await db.execute(
-        `INSERT INTO settings (key, value) VALUES ('diag_probe', '1')
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      const supabase = getSupabase();
+      unwrap(
+        await supabase
+          .from("settings")
+          .upsert({ key: "diag_probe", value: "1" }, { onConflict: "key" }),
       );
-      const rows = await db.select<{ value: string }[]>(
-        `SELECT value FROM settings WHERE key = 'diag_probe'`,
-      );
-      await db.execute(`DELETE FROM settings WHERE key = 'diag_probe'`);
-      if (rows[0]?.value !== "1") throw new Error("leitura/gravação inconsistente");
+      const row = unwrap(
+        await supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "diag_probe")
+          .maybeSingle(),
+      ) as { value: string } | null;
+      unwrap(await supabase.from("settings").delete().eq("key", "diag_probe"));
+      if (row?.value !== "1") throw new Error("leitura/gravação inconsistente");
       return "leitura e gravação funcionando";
     },
     { critical: true },
@@ -137,7 +142,7 @@ export async function runDiagnostics(
       companyId = result.id;
       return `criada (id ${result.id})`;
     },
-    { needs: ["Banco de dados"] },
+    { needs: ["Banco de dados (nuvem)"] },
   );
 
   await run(

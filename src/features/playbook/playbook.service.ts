@@ -1,4 +1,4 @@
-import { getDatabase } from "../../lib/database";
+import { getSupabase, unwrap } from "../../lib/store";
 import { normalizeText } from "../../lib/normalize";
 
 export const PLAYBOOK_SEGMENTS = [
@@ -51,31 +51,41 @@ function templates(segment: string): Record<PlaybookKind, string> {
 }
 
 export async function ensurePlaybookSeed(): Promise<void> {
-  const db = await getDatabase();
+  const supabase = getSupabase();
 
-  const [{ n }] = await db.select<{ n: number }[]>(
-    `SELECT COUNT(*) AS n FROM playbook_scripts`,
-  );
+  const { count, error } = await supabase
+    .from("playbook_scripts")
+    .select("id", { count: "exact", head: true });
 
-  if (n > 0) return;
+  if (error) throw new Error(error.message);
 
-  for (const segment of PLAYBOOK_SEGMENTS) {
+  if ((count ?? 0) > 0) return;
+
+  const rows = PLAYBOOK_SEGMENTS.flatMap((segment) => {
     const t = templates(segment);
 
-    for (const kind of PLAYBOOK_KINDS) {
-      await db.execute(
-        `INSERT INTO playbook_scripts (segment, kind, title, body) VALUES ($1,$2,$3,$4)`,
-        [segment, kind, `${segment} — ${kind}`, t[kind]],
-      );
-    }
-  }
+    return PLAYBOOK_KINDS.map((kind) => ({
+      segment,
+      kind,
+      title: `${segment} — ${kind}`,
+      body: t[kind],
+    }));
+  });
+
+  unwrap(await supabase.from("playbook_scripts").insert(rows));
 }
 
 export async function listScripts(): Promise<PlaybookScript[]> {
-  const db = await getDatabase();
+  const rows = unwrap(
+    await getSupabase()
+      .from("playbook_scripts")
+      .select("id,segment,kind,title,body")
+      .order("id", { ascending: true }),
+  ) as PlaybookScript[];
 
-  return db.select<PlaybookScript[]>(
-    `SELECT id, segment, kind, title, body FROM playbook_scripts ORDER BY segment, id`,
+  return rows.sort(
+    (a, b) =>
+      a.segment.localeCompare(b.segment) || a.id - b.id,
   );
 }
 
@@ -85,11 +95,11 @@ export async function updateScript(
 ): Promise<void> {
   if (!body.trim()) throw new Error("O script não pode ficar vazio.");
 
-  const db = await getDatabase();
-
-  await db.execute(
-    `UPDATE playbook_scripts SET body = $2 WHERE id = $1`,
-    [id, body.trim()],
+  unwrap(
+    await getSupabase()
+      .from("playbook_scripts")
+      .update({ body: body.trim() })
+      .eq("id", id),
   );
 }
 
@@ -114,17 +124,19 @@ export async function findScript(
   segment: string | null,
   kind: PlaybookKind,
 ): Promise<PlaybookScript | null> {
-  const db = await getDatabase();
-
   const wanted = normalizeText(segment);
 
-  const scripts = await db.select<PlaybookScript[]>(
-    `SELECT id, segment, kind, title, body FROM playbook_scripts WHERE kind = $1`,
-    [kind],
-  );
+  const scripts = unwrap(
+    await getSupabase()
+      .from("playbook_scripts")
+      .select("id,segment,kind,title,body")
+      .eq("kind", kind),
+  ) as PlaybookScript[];
 
   return (
-    scripts.find((s) => wanted && wanted.includes(normalizeText(s.segment))) ??
+    scripts.find(
+      (s) => wanted && wanted.includes(normalizeText(s.segment)),
+    ) ??
     scripts.find((s) => s.segment === "serviços locais") ??
     null
   );

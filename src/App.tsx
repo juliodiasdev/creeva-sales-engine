@@ -31,13 +31,12 @@ import { ProspectDetailPage } from "./pages/ProspectDetailPage";
 
 import { errorMessage } from "./lib/format";
 
-import {
-  initDatabase,
-} from "./lib/migrations";
+import { initApp } from "./lib/init";
+import { getSession, onAuthChange, signOut } from "./lib/auth";
+import { loadConfig } from "./lib/supabase";
 
-import {
-  ensurePlaybookSeed,
-} from "./features/playbook/playbook.service";
+import { LoginPage } from "./pages/LoginPage";
+import { SetupPage } from "./pages/SetupPage";
 
 function renderPage(
   page: PageId,
@@ -84,7 +83,12 @@ function App() {
     }
   });
 
-  const [ready, setReady] = useState(false);
+  const [phase, setPhase] = useState<
+    "config" | "login" | "loading" | "ready" | "error"
+  >(() => (loadConfig() ? "loading" : "config"));
+
+  const [userEmail, setUserEmail] = useState("");
+
 
   function toggleSidebar() {
     setCollapsed((value) => {
@@ -138,26 +142,88 @@ function App() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    initDatabase()
-      .then(() => ensurePlaybookSeed())
-      .then(() => setReady(true))
-      .catch((err) => {
-        console.error(err);
-        setError(
-          `Erro ao inicializar o banco de dados: ${errorMessage(err, "causa desconhecida")}`,
-        );
-      });
-  }, []);
+    if (phase !== "loading") return;
 
-  if (error) {
+    let cancelled = false;
+
+    async function start() {
+      try {
+        const session = await getSession();
+
+        if (cancelled) return;
+
+        if (!session) {
+          setPhase("login");
+          return;
+        }
+
+        setUserEmail(session.user.email ?? "");
+        await initApp();
+
+        if (!cancelled) setPhase("ready");
+      } catch (err) {
+        if (cancelled) return;
+
+        console.error(err);
+        setError(errorMessage(err, "Erro ao iniciar o aplicativo."));
+        setPhase("error");
+      }
+    }
+
+    void start();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
+
+  // Login/logout em tempo real (inclui expiração da sessão).
+  useEffect(() => {
+    if (!loadConfig()) return;
+
+    return onAuthChange((session) => {
+      setUserEmail(session?.user.email ?? "");
+      setPhase((current) =>
+        session
+          ? current === "login" ? "loading" : current
+          : current === "config" ? current : "login",
+      );
+    });
+  }, [phase === "config"]);
+
+  if (phase === "config") {
+    return <SetupPage onDone={() => setPhase("loading")} />;
+  }
+
+  if (phase === "login") {
+    return <LoginPage onReconfigure={() => setPhase("config")} />;
+  }
+
+  if (phase === "error") {
     return (
       <main className="app">
-        <p className="error">{error}</p>
+        <div>
+          <p className="error">{error}</p>
+
+          <div className="outreach-actions">
+            <button type="button" onClick={() => setPhase("loading")}>
+              Tentar novamente
+            </button>
+
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void signOut()}
+            >
+              Sair
+            </button>
+          </div>
+        </div>
       </main>
     );
   }
 
-  if (!ready) {
+  if (phase !== "ready") {
     return (
       <main className="app">
         <img className="loading-logo" src={logo} alt="Creava" />
@@ -183,6 +249,8 @@ function App() {
         collapsed={collapsed}
         onNavigate={navigate}
         onToggle={toggleSidebar}
+        userEmail={userEmail}
+        onSignOut={() => void signOut()}
       />
 
       <div className="main">

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMigratedTestDb } from "../../test/testDb";
-import type { Db } from "../../lib/database";
+import type { Db } from "../../test/dbTypes";
 
 let db: Db;
 
-vi.mock("../../lib/database", () => ({ getDatabase: async () => db }));
+vi.mock("../../lib/supabase", async () => {
+  const { testClient } = await import("../../test/testDb");
+  return { getSupabase: () => testClient() };
+});
 vi.mock("../../lib/http", () => ({ httpFetch: vi.fn() }));
 
 import { createCompany } from "../companies/company.service";
@@ -66,9 +69,12 @@ describe("backup", () => {
     const keys = await db.select<{ value: string }[]>("SELECT value FROM settings WHERE key='openai_api_key'");
     expect(keys[0].value).toBe("sk-secret");
 
-    await expect(validateBackup({ format: "x" })).rejects.toThrow();
-    await expect(validateBackup({ ...file, schemaVersion: 999 })).rejects.toThrow(/mais novo/);
-    await expect(validateBackup({ ...file, tables: { companies: [{ evil: 1 }] } })).rejects.toThrow(/desconhecida/);
+    expect(() => validateBackup({ format: "x" })).toThrow();
+    expect(() => validateBackup({ ...file, schemaVersion: 999 })).toThrow(/mais novo/);
+    expect(() => validateBackup({ ...file, tables: { companies: [{ evil: 1 }] } })).toThrow(/desconhecida/);
+
+    // backup do app local antigo (schema v3) continua importável
+    await importBackup({ ...JSON.parse(JSON.stringify(file)), schemaVersion: 3 });
   });
 });
 

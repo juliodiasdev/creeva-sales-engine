@@ -1,4 +1,4 @@
-import { getDatabase } from "../../lib/database";
+import { fetchAllPages, getSupabase, unwrap } from "../../lib/store";
 
 export async function recordApiUsage(input: {
   provider: "GOOGLE_PLACES" | "OPENAI" | "CNPJ" | "WEBSITE";
@@ -7,20 +7,16 @@ export async function recordApiUsage(input: {
   tokens?: number;
   estimatedCost?: number;
 }): Promise<void> {
-  const db = await getDatabase();
-
-  await db.execute(
-    `
-      INSERT INTO api_usage (provider, operation, requests, tokens, estimated_cost)
-      VALUES ($1, $2, $3, $4, $5)
-    `,
-    [
-      input.provider,
-      input.operation,
-      input.requests ?? 1,
-      input.tokens ?? 0,
-      input.estimatedCost ?? 0,
-    ],
+  unwrap(
+    await getSupabase()
+      .from("api_usage")
+      .insert({
+        provider: input.provider,
+        operation: input.operation,
+        requests: input.requests ?? 1,
+        tokens: input.tokens ?? 0,
+        estimated_cost: input.estimatedCost ?? 0,
+      }),
   );
 }
 
@@ -32,16 +28,36 @@ export async function getApiUsageSummary(): Promise<
     estimated_cost: number;
   }[]
 > {
-  const db = await getDatabase();
-
-  return db.select(
-    `
-      SELECT provider,
-             SUM(requests) AS requests,
-             SUM(tokens) AS tokens,
-             SUM(estimated_cost) AS estimated_cost
-      FROM api_usage
-      GROUP BY provider
-    `,
+  const rows = await fetchAllPages<{
+    provider: string;
+    requests: number;
+    tokens: number;
+    estimated_cost: number;
+  }>((from, to) =>
+    getSupabase()
+      .from("api_usage")
+      .select("provider,requests,tokens,estimated_cost")
+      .range(from, to) as never,
   );
+
+  const totals = new Map<
+    string,
+    { provider: string; requests: number; tokens: number; estimated_cost: number }
+  >();
+
+  for (const row of rows) {
+    const t = totals.get(row.provider) ?? {
+      provider: row.provider,
+      requests: 0,
+      tokens: 0,
+      estimated_cost: 0,
+    };
+
+    t.requests += Number(row.requests);
+    t.tokens += Number(row.tokens);
+    t.estimated_cost += Number(row.estimated_cost);
+    totals.set(row.provider, t);
+  }
+
+  return [...totals.values()];
 }

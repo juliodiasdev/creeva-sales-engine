@@ -94,6 +94,8 @@ interface Props {
   collapsed: boolean;
   onNavigate: (page: PageId) => void;
   onToggle: () => void;
+  userEmail: string;
+  onSignOut: () => void;
 }
 
 export function Sidebar({
@@ -101,6 +103,8 @@ export function Sidebar({
   collapsed,
   onNavigate,
   onToggle,
+  userEmail,
+  onSignOut,
 }: Props) {
   return (
     <aside className="sidebar">
@@ -143,6 +147,19 @@ export function Sidebar({
           </button>
         ))}
       </nav>
+
+      <div className="user-box" title={userEmail}>
+        <span className="user-email">{userEmail || "Conectado"}</span>
+
+        <button
+          type="button"
+          className="collapse-btn"
+          title="Sair da conta"
+          onClick={onSignOut}
+        >
+          ⎋<span className="collapse-label"> Sair</span>
+        </button>
+      </div>
 
       <button
         type="button"
