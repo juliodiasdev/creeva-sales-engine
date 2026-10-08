@@ -47,7 +47,7 @@ export function LoginPage({
 
         <div className="auth-brand">
           <strong>CREAVA</strong>
-          <span className="eyebrow">SALES ENGINE</span>
+          <span className="eyebrow">DIGITAL · AGÊNCIA</span>
         </div>
 
         <label>

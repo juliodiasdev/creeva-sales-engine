@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { ReactNode } from "react";
 
 import logo from "../assets/creava-logo.png";
@@ -81,20 +82,25 @@ const ICONS: Record<PageId, ReactNode> = {
   ),
 };
 
-export const NAV_ITEMS: {
+export interface NavItem {
   id: PageId;
   label: string;
-}[] = [
-  { id: "today", label: "Today" },
-  { id: "dashboard", label: "Dashboard" },
-  { id: "discovery", label: "Discovery" },
-  { id: "companies", label: "Companies" },
-  { id: "contacts", label: "Contatos" },
-  { id: "prospects", label: "Prospects" },
-  { id: "pipeline", label: "Pipeline" },
-  { id: "session", label: "Sessão" },
-  { id: "playbook", label: "Playbook" },
-  { id: "settings", label: "Settings" },
+  description: string;
+  section: string;
+}
+
+/** Ordem = atalhos Ctrl+1…Ctrl+0. Agrupado como nos grandes CRMs. */
+export const NAV_ITEMS: NavItem[] = [
+  { id: "today", label: "Hoje", section: "VENDAS", description: "Suas tarefas do dia: o que fazer agora para gerar clientes." },
+  { id: "session", label: "Prospectar agora", section: "VENDAS", description: "Uma empresa por vez: copie, envie e passe para a próxima." },
+  { id: "pipeline", label: "Funil de vendas", section: "VENDAS", description: "Acompanhe cada empresa do primeiro contato até o fechamento." },
+  { id: "prospects", label: "Em prospecção", section: "VENDAS", description: "Empresas que você já decidiu trabalhar." },
+  { id: "discovery", label: "Buscar empresas", section: "BASE DE CONTATOS", description: "Encontre novas empresas no Google, sem repetir as que você já coletou." },
+  { id: "companies", label: "Empresas", section: "BASE DE CONTATOS", description: "Todas as empresas cadastradas, com organização de duplicados." },
+  { id: "contacts", label: "Contatos", section: "BASE DE CONTATOS", description: "WhatsApp, redes sociais e e-mail de cada empresa, com exportação para planilha." },
+  { id: "dashboard", label: "Resultados", section: "ANÁLISE", description: "Números reais: respostas, reuniões, propostas e receita." },
+  { id: "playbook", label: "Mensagens prontas", section: "CONFIGURAÇÃO", description: "Modelos de mensagem por segmento e etapa." },
+  { id: "settings", label: "Configurações", section: "CONFIGURAÇÃO", description: "Serviços, integrações, backup e preferências." },
 ];
 
 interface Props {
@@ -123,15 +129,19 @@ export function Sidebar({
           <strong>CREAVA</strong>
 
           <span className="eyebrow">
-            SALES ENGINE
+            DIGITAL · AGÊNCIA
           </span>
         </div>
       </div>
 
       <nav>
         {NAV_ITEMS.map((item, index) => (
+          <Fragment key={item.id}>
+            {(index === 0 || NAV_ITEMS[index - 1].section !== item.section) && (
+              <span className="nav-section">{item.section}</span>
+            )}
+
           <button
-            key={item.id}
             type="button"
             title={`${item.label} (Ctrl+${(index + 1) % 10})`}
             className={
@@ -153,6 +163,7 @@ export function Sidebar({
               ^{(index + 1) % 10}
             </span>
           </button>
+          </Fragment>
         ))}
       </nav>
 

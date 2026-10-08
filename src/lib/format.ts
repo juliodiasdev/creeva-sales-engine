@@ -27,6 +27,16 @@ export function formatCurrency(
   });
 }
 
+/** (65) 99999-1234 / (65) 3333-1234 a partir de dígitos. */
+export function formatPhone(digits: string | null | undefined): string {
+  const d = (digits ?? "").replace(/\D/g, "");
+
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+
+  return digits ?? "";
+}
+
 export function errorMessage(
   err: unknown,
   fallback: string,

@@ -135,6 +135,11 @@ class Query implements PromiseLike<unknown> {
   in(c: string, v: unknown[]) { return this.add(c, "in", v); }
   is(c: string, v: unknown) { return this.add(c, "is", v); }
 
+  ilike(c: string, pattern: string) {
+    this.filters.push({ sql: `LOWER(${ident(c)}) LIKE LOWER(?)`, params: [pattern] });
+    return this;
+  }
+
   not(c: string, op: string, v: unknown) {
     const f = condition(c, op, v);
     this.filters.push({ sql: `NOT (${f.sql})`, params: f.params });

@@ -82,7 +82,7 @@ export function EnrichDialog({
         <span>
           <strong>Analisar e sugerir serviços</strong>
           <small>
-            Sinais, score com explicação, serviços da Creava mais
+            Sinais, pontuação com explicação, serviços da Creava mais
             adequados e abordagens por canal (templates). Sem IA, sem custo.
           </small>
         </span>

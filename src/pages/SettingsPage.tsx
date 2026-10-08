@@ -40,15 +40,15 @@ const FIELDS: [SettingKey, string, string][] = [
   ["default_city", "Cidade padrão", "Cuiabá"],
   ["default_state", "UF padrão", "MT"],
   ["preferred_segments", "Segmentos preferidos (separados por vírgula)", "odontologia, advocacia"],
-  ["min_score", "Score mínimo para qualificar", "50"],
-  ["follow_up_delay_days", "Dias até o follow-up", "2"],
-  ["proposal_follow_up_days", "Dias até follow-up da proposta", "3"],
+  ["min_score", "Pontuação mínima para qualificar", "50"],
+  ["follow_up_delay_days", "Dias até o retorno (follow-up)", "2"],
+  ["proposal_follow_up_days", "Dias até o retorno da proposta", "3"],
   ["openai_model", "Modelo OpenAI", "gpt-4o-mini"],
 ];
 
 const SECRETS: [SettingKey, string][] = [
-  ["google_api_key", "Google Places API key"],
-  ["openai_api_key", "OpenAI API key"],
+  ["google_api_key", "Google (busca de empresas)"],
+  ["openai_api_key", "OpenAI (IA)"],
 ];
 
 type DangerAction = "keys" | "data" | "all";
@@ -244,7 +244,7 @@ export function SettingsPage() {
       <section className="panel">
         <div className="panel-title">
           <div>
-            <span className="eyebrow">SETTINGS</span>
+            <span className="eyebrow">CONFIGURAÇÕES</span>
             <h2>Preferências</h2>
           </div>
         </div>
@@ -264,34 +264,41 @@ export function SettingsPage() {
           ))}
         </div>
 
-        <h3 className="group-title">Chaves de API</h3>
+        <h3 className="group-title">Chaves das integrações</h3>
 
-        <div className="company-form">
+        <div className="secret-grid">
           {SECRETS.map(([key, label]) => (
-            <label key={key}>
-              {label}{" "}
-              {configured[key] && (
-                <>
-                  <span className="status">configurada</span>{" "}
+            <div className="secret-field" key={key}>
+              <div className="secret-head">
+                <strong>{label}</strong>
+
+                {configured[key] ? (
+                  <span className="status">configurada</span>
+                ) : (
+                  <span className="muted">não configurada</span>
+                )}
+
+                {configured[key] && (
                   <button
                     type="button"
-                    className="secondary"
+                    className="secondary small-btn"
                     onClick={() => void removeSecret(key)}
                   >
                     remover
                   </button>
-                </>
-              )}
+                )}
+              </div>
+
               <input
                 type="password"
                 autoComplete="off"
-                placeholder={configured[key] ? "•••••••• (digite para substituir)" : "cole a chave"}
+                placeholder={configured[key] ? "•••••••• (digite para substituir)" : "cole a chave aqui"}
                 value={secretInputs[key] ?? ""}
                 onChange={(e) =>
                   setSecretInputs({ ...secretInputs, [key]: e.target.value })
                 }
               />
-            </label>
+            </div>
           ))}
         </div>
 
@@ -316,7 +323,8 @@ export function SettingsPage() {
         </div>
 
         <p className="muted">
-          As chaves ficam apenas no banco local e nunca são exibidas, exportadas
+          As chaves ficam guardadas no seu banco na nuvem (valem para quem entra
+          com o mesmo login) e nunca são exibidas de novo, exportadas em backup
           nem enviadas ao Git.
         </p>
 
@@ -330,7 +338,7 @@ export function SettingsPage() {
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Uso de APIs</h2>
+          <h2>Uso das integrações (Google e OpenAI)</h2>
         </div>
 
         {usage.length === 0 ? (

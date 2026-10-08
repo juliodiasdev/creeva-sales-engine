@@ -23,6 +23,7 @@ import {
 
 import { DuplicatesPanel } from "../features/duplicates/DuplicatesPanel";
 
+import { label, LEAD_STATUS_LABEL } from "../lib/labels";
 import { ErrorMessage } from "../components/ErrorMessage";
 
 function messageOf(
@@ -230,10 +231,10 @@ export function CompaniesPage({ onOpenCompany }: Props) {
         <div className="panel-title">
           <div>
             <span className="eyebrow">
-              DATABASE
+              BASE
             </span>
 
-            <h2>Empresas</h2>
+            <h2>Empresas cadastradas</h2>
           </div>
 
           <span className="counter">
@@ -252,7 +253,7 @@ export function CompaniesPage({ onOpenCompany }: Props) {
               <span>Segmento</span>
               <span>Cidade</span>
               <span>UF</span>
-              <span>Lead</span>
+              <span>Situação</span>
               <span>Ação</span>
             </div>
 
@@ -274,7 +275,7 @@ export function CompaniesPage({ onOpenCompany }: Props) {
 
                 <span>{company.state || "—"}</span>
 
-                <span>{company.lead_status}</span>
+                <span>{label(LEAD_STATUS_LABEL, company.lead_status)}</span>
 
                 <div className="action-cell">
                   {prospectCompanyIds.has(

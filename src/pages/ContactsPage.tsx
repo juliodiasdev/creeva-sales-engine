@@ -11,6 +11,7 @@ import { EnrichDialog } from "../features/enrichment/EnrichDialog";
 import { loadContactRows } from "../features/export/export.service";
 import { downloadCsv, downloadXlsx } from "../features/export/download";
 
+import { label, LEAD_STATUS_LABEL } from "../lib/labels";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
 
@@ -198,7 +199,7 @@ export function ContactsPage({
                       {[company.segment, company.city, company.state]
                         .filter(Boolean)
                         .join(" · ") || "—"}
-                      {score !== null ? ` · score ${score}` : ""}
+                      {score !== null ? ` · pontuação ${score}` : ""}
                     </p>
 
                     <ChannelButtons
@@ -210,7 +211,7 @@ export function ContactsPage({
                   </div>
 
                   <div className="task-actions">
-                    <span className="status">{company.lead_status}</span>
+                    <span className="status">{label(LEAD_STATUS_LABEL, company.lead_status)}</span>
 
                     <button
                       type="button"

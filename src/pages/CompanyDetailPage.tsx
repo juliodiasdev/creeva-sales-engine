@@ -22,6 +22,7 @@ import {
 } from "../features/ai/ai.service";
 import type { StoredAnalysis } from "../features/ai/ai.service";
 
+import { label, LEAD_STATUS_LABEL, SCORE_DIMENSION_LABEL, SIGNAL_LABEL, SOURCE_LABEL, humanizeReason } from "../lib/labels";
 import { createProspect } from "../features/prospects/prospect.service";
 
 import { ChannelButtons } from "../features/contacts/ChannelButtons";
@@ -42,7 +43,7 @@ import { ConfirmButton } from "../components/ConfirmButton";
 import { openExternal } from "../lib/opener";
 
 import { ErrorMessage } from "../components/ErrorMessage";
-import { errorMessage } from "../lib/format";
+import { errorMessage, formatPhone } from "../lib/format";
 
 interface Props {
   companyId: number;
@@ -140,12 +141,12 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
               {[company.segment, company.city, company.state].filter(Boolean).join(" · ") || "—"}
             </p>
           </div>
-          <span className="status">{company.lead_status}</span>
+          <span className="status">{label(LEAD_STATUS_LABEL, company.lead_status)}</span>
         </div>
 
         <div className="detail-grid">
           <span>Website: {company.website || "—"}</span>
-          <span>Telefone: {company.phone || "—"}</span>
+          <span>Telefone: {company.phone ? formatPhone(company.phone) : "—"}</span>
           <span>Endereço: {company.address || "—"}</span>
           <span>Google: {company.rating ?? "—"} ({company.reviews_count ?? 0} avaliações)</span>
           <span>CNPJ: {company.cnpj || "—"}</span>
@@ -255,9 +256,9 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
           <ul className="reasons">
             {channels.map((ch) => (
               <li key={ch.id}>
-                <strong>{CHANNEL_LABEL[ch.kind]}</strong> — {ch.value}{" "}
+                <strong>{CHANNEL_LABEL[ch.kind]}</strong> — {ch.kind === "PHONE" || ch.kind === "WHATSAPP" ? formatPhone(ch.value) : ch.value}{" "}
                 <small>
-                  ({ch.label ? `${ch.label}; ` : ""}fonte: {ch.source})
+                  ({ch.label ? `${ch.label}; ` : ""}fonte: {label(SOURCE_LABEL, ch.source)})
                 </small>
               </li>
             ))}
@@ -381,23 +382,23 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Score {score ? `${score.total}/100` : ""}</h2>
+          <h2>Pontuação {score ? `${score.total}/100` : ""}</h2>
           {score && (
             <span className="counter">confiança {Math.round(score.confidence * 100)}%</span>
           )}
         </div>
 
         {!score ? (
-          <div className="empty">Sem score. Rode "Enriquecer".</div>
+          <div className="empty">Sem pontuação ainda. Use "Enriquecer…".</div>
         ) : (
           <>
             <p className="muted">
-              FIT {score.fit}/25 · NEED {score.need}/25 · CAPACITY {score.capacity}/25 · INTENT {score.intent}/25
+              Aderência {score.fit}/25 · Necessidade {score.need}/25 · Capacidade {score.capacity}/25 · Interesse {score.intent}/25
             </p>
             <ul className="reasons">
               {reasons.map((r, i) => (
                 <li key={i}>
-                  <strong>+{r.points}</strong> <small>{r.dimension}</small> — {r.reason}
+                  <strong>+{r.points}</strong> <small>{label(SCORE_DIMENSION_LABEL, r.dimension)}</small> — {humanizeReason(r.reason)}
                 </li>
               ))}
             </ul>
@@ -416,8 +417,8 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
           <ul className="reasons">
             {signals.map((s) => (
               <li key={s.id}>
-                <strong>{s.type}</strong> — {s.evidence}{" "}
-                <small>({s.source}, confiança {Math.round(s.confidence * 100)}%)</small>
+                <strong>{label(SIGNAL_LABEL, s.type)}</strong> — {s.evidence}{" "}
+                <small>({label(SOURCE_LABEL, s.source)}, confiança {Math.round(s.confidence * 100)}%)</small>
               </li>
             ))}
           </ul>
@@ -427,7 +428,7 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
       {analysis && (
         <section className="panel">
           <div className="panel-title">
-            <h2>Análise IA</h2>
+            <h2>Análise da IA</h2>
             <span className="counter">confiança {Math.round(analysis.confidence * 100)}%</span>
           </div>
           <div className="detail-grid">

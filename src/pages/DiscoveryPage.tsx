@@ -18,6 +18,7 @@ import { listJobs } from "../features/jobs/job.service";
 import type { Job } from "../features/jobs/job.service";
 import { getSetting } from "../features/settings/settings.service";
 
+import { label, JOB_STATUS_LABEL, JOB_TYPE_LABEL } from "../lib/labels";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage, formatDateTime } from "../lib/format";
 
@@ -145,8 +146,8 @@ export function DiscoveryPage() {
       <section className="panel">
         <div className="panel-title">
           <div>
-            <span className="eyebrow">DISCOVERY</span>
-            <h2>Buscar empresas (Google Places)</h2>
+            <span className="eyebrow">BUSCAR EMPRESAS</span>
+            <h2>Encontrar empresas no Google</h2>
           </div>
         </div>
 
@@ -195,7 +196,7 @@ export function DiscoveryPage() {
             disabled={running}
             onClick={() => void enrichPending()}
           >
-            Enriquecer descobertas pendentes (até 50)
+            Enriquecer novas empresas (até 50)
           </button>
 
           <button
@@ -217,7 +218,7 @@ export function DiscoveryPage() {
           onClose={() => setOfferFor(null)}
           onStarted={() => {
             setOfferFor(null);
-            setMessage("Enriquecimento iniciado. Acompanhe nos jobs abaixo.");
+            setMessage("Enriquecimento iniciado. Acompanhe nas execuções abaixo.");
             void refresh();
           }}
         />
@@ -225,11 +226,11 @@ export function DiscoveryPage() {
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Jobs</h2>
+          <h2>Execuções em andamento e recentes</h2>
         </div>
 
         {jobs.length === 0 ? (
-          <div className="empty">Nenhum job executado.</div>
+          <div className="empty">Nenhuma execução ainda.</div>
         ) : (
           <div className="tasks-list">
             {jobs.map((j) => {
@@ -238,9 +239,9 @@ export function DiscoveryPage() {
               return (
                 <article className="task-item" key={j.id}>
                   <div className="task-body">
-                    <strong>{j.type} #{j.id}</strong>
+                    <strong>{label(JOB_TYPE_LABEL, j.type)} #{j.id}</strong>
                     <p>
-                      {j.status} · {j.progress}%
+                      {label(JOB_STATUS_LABEL, j.status)} · {j.progress}%
                       {j.error ? ` · ${j.error}` : ""}
                       {r
                         ? ` · ${r.found} encontradas, ${r.imported} novas, ${r.duplicates} duplicadas, ${r.alreadySeen} já coletadas antes`

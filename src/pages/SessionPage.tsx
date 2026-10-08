@@ -12,6 +12,7 @@ import {
 import { changeProspectStatus } from "../features/workflow/workflow.service";
 
 import { ChannelButtons } from "../features/contacts/ChannelButtons";
+import { label, TASK_TYPE_LABEL } from "../lib/labels";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
 
@@ -82,10 +83,10 @@ export function SessionPage({ onOpenProspect }: Props) {
       <section className="panel">
         <div className="panel-title">
           <div>
-            <span className="eyebrow">SESSÃO DE PROSPECÇÃO</span>
-            <h2>Fila vazia</h2>
+            <span className="eyebrow">PROSPECTAR AGORA</span>
+            <h2>Tudo em dia por aqui</h2>
           </div>
-          <span className="counter">{done} enviados nesta sessão</span>
+          <span className="counter">{done} enviados nesta rodada</span>
         </div>
         <div className="empty">Nenhuma abordagem pendente agora.</div>
         <ErrorMessage message={error} />
@@ -99,13 +100,13 @@ export function SessionPage({ onOpenProspect }: Props) {
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="eyebrow">SESSÃO DE PROSPECÇÃO</span>
+          <span className="eyebrow">PROSPECTAR AGORA</span>
           <h2>{task.company_name}</h2>
           <p className="muted">
-            {task.type} · score {item.score ?? task.prospect_score}
+            {label(TASK_TYPE_LABEL, task.type)} · pontuação {item.score ?? task.prospect_score}
           </p>
         </div>
-        <span className="counter">{done} enviados nesta sessão</span>
+        <span className="counter">{done} enviados nesta rodada</span>
       </div>
 
       {analysis ? (

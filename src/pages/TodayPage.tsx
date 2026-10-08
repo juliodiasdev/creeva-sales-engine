@@ -32,6 +32,9 @@ import {
   skipTask,
 } from "../features/workflow/workflow.service";
 
+import { label, TASK_TYPE_LABEL, PRIORITY_LABEL } from "../lib/labels";
+import { STATUS_LABEL } from "../features/prospects/prospect.labels";
+import type { ProspectStatus } from "../features/prospects/prospect.types";
 import { ErrorMessage } from "../components/ErrorMessage";
 
 function messageOf(
@@ -136,8 +139,8 @@ export function TodayPage({ onOpenProspect }: Props) {
           <strong>{task.company_name}</strong>
 
           <p>
-            {task.type} · {task.title}
-            {task.priority === "HIGH" ? " · ALTA" : ""}
+            {label(TASK_TYPE_LABEL, task.type)} · {task.title}
+            {task.priority === "HIGH" ? ` · prioridade ${label(PRIORITY_LABEL, task.priority).toLowerCase()}` : ""}
           </p>
 
           {isOpen && draft && (
@@ -154,6 +157,11 @@ export function TodayPage({ onOpenProspect }: Props) {
         </div>
 
         <div className="task-actions">
+          <span className="status">
+            {STATUS_LABEL[task.prospect_status as ProspectStatus] ??
+              task.prospect_status}
+          </span>
+
           {hasOutreach && !isOpen && (
             <button type="button" onClick={() => void handlePrepare(task.id)}>
               Preparar abordagem
@@ -203,13 +211,40 @@ export function TodayPage({ onOpenProspect }: Props) {
     );
   }
 
+  const firstContacts = tasks.filter((t) => t.type === "FIRST_CONTACT").length;
+  const followUps = tasks.filter((t) => t.type === "FOLLOW_UP").length;
+
   return (
+    <>
+    <section className="metrics">
+      <article className="metric-card">
+        <span>Atrasadas</span>
+        <strong className={overdue.length ? "danger-text" : undefined}>{overdue.length}</strong>
+        <small>Precisam de atenção primeiro</small>
+      </article>
+      <article className="metric-card">
+        <span>Para hoje</span>
+        <strong>{today.length}</strong>
+        <small>Tarefas do dia</small>
+      </article>
+      <article className="metric-card">
+        <span>Primeiros contatos</span>
+        <strong>{firstContacts}</strong>
+        <small>Empresas esperando abordagem</small>
+      </article>
+      <article className="metric-card">
+        <span>Retornos</span>
+        <strong>{followUps}</strong>
+        <small>Follow-ups a fazer</small>
+      </article>
+    </section>
+
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="eyebrow">TODAY</span>
+          <span className="eyebrow">TAREFAS DO DIA</span>
 
-          <h2>Próximas ações</h2>
+          <h2>O que fazer agora</h2>
         </div>
 
         <span className="counter">
@@ -249,5 +284,6 @@ export function TodayPage({ onOpenProspect }: Props) {
         </>
       )}
     </section>
+    </>
   );
 }
