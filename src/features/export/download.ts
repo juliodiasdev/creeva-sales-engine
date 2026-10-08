@@ -1,30 +1,23 @@
 import writeXlsxFile from "write-excel-file/browser";
 
+import { saveFile, saveText } from "../../lib/saveFile";
+
 import { CONTACT_COLUMNS, toCsv } from "./export.service";
 import type { ContactRow } from "./export.service";
 
-function save(blob: Blob, fileName: string): void {
-  const link = document.createElement("a");
-
-  link.href = URL.createObjectURL(blob);
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
-}
-
 const stamp = () => new Date().toISOString().slice(0, 10);
 
-export function downloadCsv(rows: ContactRow[]): void {
-  save(
-    new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" }),
+/** Retorna o caminho salvo (ou null se o usuário cancelou). */
+export function downloadCsv(rows: ContactRow[]): Promise<string | null> {
+  return saveText(
     `creava-contatos-${stamp()}.csv`,
+    toCsv(rows),
+    [{ name: "CSV (Excel)", extensions: ["csv"] }],
+    "text/csv;charset=utf-8",
   );
 }
 
-export async function downloadXlsx(rows: ContactRow[]): Promise<void> {
+export async function downloadXlsx(rows: ContactRow[]): Promise<string | null> {
   const header = CONTACT_COLUMNS.map((c) => ({
     value: c.title,
     fontWeight: "bold" as const,
@@ -54,6 +47,12 @@ export async function downloadXlsx(rows: ContactRow[]): Promise<void> {
     },
   );
 
-  // Mesmo caminho de download do CSV (link temporário).
-  save(await file.toBlob(), `creava-contatos-${stamp()}.xlsx`);
+  const blob = await file.toBlob();
+
+  return saveFile(
+    `creava-contatos-${stamp()}.xlsx`,
+    new Uint8Array(await blob.arrayBuffer()),
+    [{ name: "Planilha do Excel", extensions: ["xlsx"] }],
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
 }

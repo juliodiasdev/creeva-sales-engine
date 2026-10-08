@@ -64,10 +64,14 @@ export function ContactsPage({
       setBusy(kind);
       const rows = await loadContactRows();
 
-      if (kind === "xlsx") await downloadXlsx(rows);
-      else downloadCsv(rows);
+      const path =
+        kind === "xlsx" ? await downloadXlsx(rows) : await downloadCsv(rows);
 
-      setMessage(`Planilha gerada com ${rows.length} empresa(s).`);
+      setMessage(
+        path
+          ? `Planilha salva (${rows.length} empresa(s)): ${path}`
+          : "Exportação cancelada.",
+      );
     } catch (err) {
       setError(errorMessage(err, "Erro ao gerar a planilha."));
     } finally {

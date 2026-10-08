@@ -124,8 +124,12 @@ export function DiscoveryPage() {
     try {
       setError("");
       const rows = await loadContactRows();
-      await downloadXlsx(rows);
-      setMessage(`Planilha gerada com ${rows.length} empresa(s).`);
+      const path = await downloadXlsx(rows);
+      setMessage(
+        path
+          ? `Planilha salva (${rows.length} empresa(s)): ${path}`
+          : "Exportação cancelada.",
+      );
     } catch (err) {
       setError(errorMessage(err, "Erro ao gerar a planilha."));
     }
