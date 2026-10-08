@@ -31,6 +31,7 @@ import {
 } from "../features/services/services.service";
 import type { Service } from "../features/services/services.service";
 
+import { saveText } from "../lib/saveFile";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
 
@@ -204,15 +205,19 @@ export function SettingsPage() {
   async function handleExport() {
     try {
       const file = await exportBackup();
-      const blob = new Blob([JSON.stringify(file, null, 2)], {
-        type: "application/json",
-      });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `creava-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-      setMessage("Backup exportado (chaves de API não são incluídas).");
+      const path = await saveText(
+        `creava-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        JSON.stringify(file, null, 2),
+        [{ name: "Backup (JSON)", extensions: ["json"] }],
+        "application/json",
+      );
+
+      if (!path) {
+        setMessage("Exportação cancelada.");
+        return;
+      }
+
+      setMessage(`Backup salvo em ${path} (as chaves de API não são incluídas).`);
     } catch (err) {
       setError(errorMessage(err, "Erro ao exportar."));
     }

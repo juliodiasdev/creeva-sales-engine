@@ -42,7 +42,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
-          releaseName: "Creava Sales Engine ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
+          releaseName: "Creava Digital - Agência ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}"
           releaseBody: "Baixe o instalador (.exe) abaixo. O Windows pode exibir o aviso do SmartScreen: clique em Mais informações → Executar assim mesmo."
           releaseDraft: false
           prerelease: false
