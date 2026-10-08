@@ -228,3 +228,22 @@ export async function listCompanyIdsByLeadStatusRepository(
 
   return rows.map((r) => Number(r.id));
 }
+
+/** Busca rápida por nome (barra de busca global). */
+export async function searchCompaniesRepository(
+  term: string,
+  limit = 8,
+): Promise<Pick<Company, "id" | "name" | "city" | "segment" | "lead_status">[]> {
+  const q = term.trim().replace(/[%_\\,()]/g, " ");
+
+  if (q.length < 2) return [];
+
+  return unwrap(
+    await getSupabase()
+      .from("companies")
+      .select("id,name,city,segment,lead_status")
+      .ilike("name", `%${q}%`)
+      .order("name", { ascending: true })
+      .limit(limit),
+  ) as Pick<Company, "id" | "name" | "city" | "segment" | "lead_status">[];
+}

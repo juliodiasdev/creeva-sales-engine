@@ -11,6 +11,7 @@ import type {
   ProspectWithCompany,
 } from "../features/prospects/prospect.types";
 
+import { STATUS_LABEL } from "../features/prospects/prospect.labels";
 import { ErrorMessage } from "../components/ErrorMessage";
 
 interface Props {
@@ -38,10 +39,10 @@ export function ProspectsPage({ onOpenProspect }: Props) {
       <div className="panel-title">
         <div>
           <span className="eyebrow">
-            PROSPECTS
+            EM PROSPECÇÃO
           </span>
 
-          <h2>Em prospecção</h2>
+          <h2>Empresas que você está trabalhando</h2>
         </div>
 
         <span className="counter">
@@ -77,7 +78,7 @@ export function ProspectsPage({ onOpenProspect }: Props) {
               </div>
 
               <span className="status">
-                {prospect.status}
+                {STATUS_LABEL[prospect.status] ?? prospect.status}
               </span>
             </article>
           ))}

@@ -36,6 +36,7 @@ import { initApp } from "./lib/init";
 import { getSession, onAuthChange, signOut } from "./lib/auth";
 import { loadConfig } from "./lib/supabase";
 
+import { GlobalSearch } from "./components/GlobalSearch";
 import { LoginPage } from "./pages/LoginPage";
 import { SetupPage } from "./pages/SetupPage";
 
@@ -235,8 +236,9 @@ function App() {
     );
   }
 
-  const pageLabel =
-    NAV_ITEMS.find((item) => item.id === page)?.label ?? "";
+  const current = NAV_ITEMS.find((item) => item.id === page);
+  const pageLabel = current?.label ?? "";
+  const pageDescription = current?.description ?? "";
 
   const detail =
     companyId !== null
@@ -258,13 +260,33 @@ function App() {
 
       <div className="main">
         <header className="topbar">
-          <h1>{pageLabel}</h1>
+          <div className="topbar-title">
+            <h1>{pageLabel}</h1>
 
-          {detail && (
-            <>
-              <span className="crumb">›</span>
-              <span className="crumb">{detail}</span>
-            </>
+            {detail ? (
+              <span className="crumb">› {detail}</span>
+            ) : (
+              <span className="crumb hint-desc">{pageDescription}</span>
+            )}
+          </div>
+
+          <span className="spacer" />
+
+          <GlobalSearch
+            onOpenCompany={(id) => {
+              setProspectId(null);
+              setCompanyId(id);
+            }}
+          />
+
+          {page !== "discovery" && (
+            <button
+              type="button"
+              className="topbar-cta"
+              onClick={() => navigate("discovery")}
+            >
+              + Buscar empresas
+            </button>
           )}
         </header>
 
@@ -293,7 +315,7 @@ function App() {
         <footer className="statusbar">
           <span>
             <span className="dot" />
-            Banco local (SQLite)
+            Conectado à nuvem · dados salvos automaticamente
           </span>
 
           <span className="spacer" />

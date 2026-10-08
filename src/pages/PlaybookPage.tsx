@@ -6,6 +6,7 @@ import {
 } from "../features/playbook/playbook.service";
 import type { PlaybookScript } from "../features/playbook/playbook.service";
 
+import { label, PLAYBOOK_KIND_LABEL } from "../lib/labels";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage } from "../lib/format";
 
@@ -44,14 +45,14 @@ export function PlaybookPage() {
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="eyebrow">PLAYBOOK</span>
-          <h2>Scripts por segmento</h2>
+          <span className="eyebrow">MENSAGENS PRONTAS</span>
+          <h2>Mensagens por segmento</h2>
         </div>
       </div>
 
       <p className="muted">
         Variáveis: {"{{empresa}}"}, {"{{agencia}}"}, {"{{cidade}}"},{" "}
-        {"{{vendedor}}"}. O Today usa estes scripts na abordagem.
+        {"{{vendedor}}"}. A tela "Hoje" usa estas mensagens na abordagem.
       </p>
 
       <ErrorMessage message={error} />
@@ -66,7 +67,7 @@ export function PlaybookPage() {
               .map((s) => (
                 <article className="task-item" key={s.id}>
                   <div className="task-body">
-                    <strong>{s.kind}</strong>
+                    <strong>{label(PLAYBOOK_KIND_LABEL, s.kind)}</strong>
 
                     {editing === s.id ? (
                       <div className="outreach">

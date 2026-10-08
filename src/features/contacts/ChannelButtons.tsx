@@ -5,6 +5,7 @@ import type { ChannelKind } from "./channels.engine";
 import type { StoredChannel } from "./channels.repository";
 
 import { openExternal } from "../../lib/opener";
+import { formatPhone } from "../../lib/format";
 
 const ORDER: ChannelKind[] = [
   "WHATSAPP",
@@ -48,7 +49,7 @@ export function ChannelButtons({
           key={ch.id}
           type="button"
           className={`channel ${ch.kind.toLowerCase()} ${size === "small" ? "small" : ""}`}
-          title={`${CHANNEL_LABEL[ch.kind]}: ${ch.value}${ch.label ? ` (${ch.label})` : ""}`}
+          title={`${CHANNEL_LABEL[ch.kind]}: ${ch.kind === "PHONE" || ch.kind === "WHATSAPP" ? formatPhone(ch.value) : ch.value}${ch.label ? ` (${ch.label})` : ""}`}
           onClick={() =>
             void openExternal(channelOpenUrl(ch, message, subject)).catch(
               (e) => setError(e instanceof Error ? e.message : "Erro ao abrir."),

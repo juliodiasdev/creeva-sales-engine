@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Creava Sales Engine",
+        "title": "Creava — Central de Vendas",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

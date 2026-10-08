@@ -76,7 +76,7 @@ export function PipelinePage({
       <article className="pipeline-card" key={p.id}>
         <strong>{p.company_name}</strong>
         <small>
-          Score {p.score} · {p.next_action || "sem próxima ação"}
+          Pontuação {p.score} · {p.next_action || "sem próxima ação"}
         </small>
 
         <div className="outreach-actions">
@@ -114,8 +114,8 @@ export function PipelinePage({
     <section className="panel">
       <div className="panel-title">
         <div>
-          <span className="eyebrow">PIPELINE</span>
-          <h2>Funil comercial</h2>
+          <span className="eyebrow">FUNIL DE VENDAS</span>
+          <h2>Etapas da venda</h2>
         </div>
 
         <button
@@ -124,8 +124,8 @@ export function PipelinePage({
           onClick={() => setShowOthers((v) => !v)}
         >
           {showOthers
-            ? "Ver funil principal"
-            : "Ver perdidos / nutrição / descartados"}
+            ? "Voltar ao funil principal"
+            : "Ver perdidos, em espera e descartados"}
         </button>
       </div>
 

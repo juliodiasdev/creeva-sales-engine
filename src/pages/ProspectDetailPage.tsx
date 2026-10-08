@@ -37,6 +37,7 @@ import {
   GUARDED_STATUSES,
 } from "../features/workflow/workflow.service";
 
+import { label, DEAL_STATUS_LABEL, LOST_REASON_LABEL, PRIORITY_LABEL, TASK_OUTCOME_LABEL, TASK_TYPE_LABEL } from "../lib/labels";
 import { ErrorMessage } from "../components/ErrorMessage";
 
 import {
@@ -165,8 +166,8 @@ export function ProspectDetailPage({
           <span>Website: {prospect.website || "—"}</span>
           <span>Telefone: {prospect.phone || "—"}</span>
           <span>Instagram: {prospect.instagram || "—"}</span>
-          <span>Prioridade: {prospect.priority}</span>
-          <span>Score: {prospect.score}</span>
+          <span>Prioridade: {label(PRIORITY_LABEL, prospect.priority)}</span>
+          <span>Pontuação: {prospect.score}</span>
           <span>
             Próxima ação: {prospect.next_action || "—"}{" "}
             {prospect.next_action_at
@@ -174,7 +175,7 @@ export function ProspectDetailPage({
               : ""}
           </span>
           {prospect.lost_reason && (
-            <span>Motivo da perda: {prospect.lost_reason}</span>
+            <span>Motivo da perda: {label(LOST_REASON_LABEL, prospect.lost_reason)}</span>
           )}
           <span>Notas: {prospect.qualification_notes || "—"}</span>
         </div>
@@ -236,11 +237,11 @@ export function ProspectDetailPage({
                 <div className="task-body">
                   <strong>{t.title}</strong>
                   <p>
-                    {t.type} · vence {formatDateTime(t.due_at)}
+                    {label(TASK_TYPE_LABEL, t.type)} · vence {formatDateTime(t.due_at)}
                   </p>
                 </div>
                 <span className="status">
-                  {t.completed_at ? (t.outcome ?? "DONE") : "ABERTA"}
+                  {t.completed_at ? label(TASK_OUTCOME_LABEL, t.outcome ?? "DONE") : "Aberta"}
                 </span>
               </article>
             ))}
@@ -261,7 +262,7 @@ export function ProspectDetailPage({
                   <strong>{d.title}</strong>
                   <p>{formatCurrency(d.value)}</p>
                 </div>
-                <span className="status">{d.status}</span>
+                <span className="status">{label(DEAL_STATUS_LABEL, d.status)}</span>
               </article>
             ))}
           </div>
@@ -270,7 +271,7 @@ export function ProspectDetailPage({
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Timeline</h2>
+          <h2>Histórico</h2>
         </div>
 
         <ol className="timeline">
@@ -414,7 +415,7 @@ function ActionForm({
             onChange={(e) => setReason(e.target.value as LostReason)}
           >
             {LOST_REASONS.map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>{label(LOST_REASON_LABEL, r)}</option>
             ))}
           </select>
           <textarea rows={2} placeholder="Observações (opcional)" value={text} onChange={(e) => setText(e.target.value)} />
