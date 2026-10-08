@@ -4,6 +4,7 @@ import {
   setLeadStatusRepository,
 } from "../companies/company.repository";
 
+import { isGenericHost } from "../../lib/normalize";
 import { startJob } from "../jobs/job.service";
 import { getSetting } from "../settings/settings.service";
 
@@ -77,7 +78,11 @@ export async function enrichCompany(
 
   let facts: WebsiteFacts | null = null;
 
-  if (company.website && options.crawlSite) {
+  if (
+    company.website &&
+    !isGenericHost(company.website) &&
+    options.crawlSite
+  ) {
     facts = await crawler(company.website);
     await saveSnapshotRepository(companyId, facts);
   } else {

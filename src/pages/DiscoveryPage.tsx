@@ -12,7 +12,7 @@ import type { SearchRecord } from "../features/discovery/discovery.repository";
 import { EnrichDialog } from "../features/enrichment/EnrichDialog";
 import { startEnrichmentForDiscovered } from "../features/enrichment/enrichment.service";
 
-import { loadContactRows } from "../features/export/export.service";
+import { loadExportData } from "../features/export/export.service";
 import { downloadXlsx } from "../features/export/download";
 import { listJobs } from "../features/jobs/job.service";
 import type { Job } from "../features/jobs/job.service";
@@ -123,11 +123,11 @@ export function DiscoveryPage() {
   async function exportSheet() {
     try {
       setError("");
-      const rows = await loadContactRows();
-      const path = await downloadXlsx(rows);
+      const data = await loadExportData();
+      const path = await downloadXlsx(data);
       setMessage(
         path
-          ? `Planilha salva (${rows.length} empresa(s)): ${path}`
+          ? `Planilha salva (${data.companies.length} empresa(s)): ${path}`
           : "Exportação cancelada.",
       );
     } catch (err) {

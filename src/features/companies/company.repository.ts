@@ -7,8 +7,8 @@ import {
 import {
   buildDedupeKey,
   normalizeCnpj,
-  normalizeDomain,
   normalizePhone,
+  siteDomain,
 } from "../../lib/normalize";
 
 import type {
@@ -39,7 +39,7 @@ export async function createCompanyRepository(
         category: input.category ?? null,
         rating: input.rating ?? null,
         reviews_count: input.reviewsCount ?? null,
-        domain: normalizeDomain(input.website),
+        domain: siteDomain(input.website),
         phone_normalized: normalizePhone(input.phone),
         dedupe_key: buildDedupeKey(
           input.name,
@@ -64,7 +64,7 @@ export async function findDuplicateCompanyRepository(
   const checks: [string, string, unknown][] = [
     ["google_place_id", "google_place_id", input.googlePlaceId || null],
     ["cnpj", "cnpj", normalizeCnpj(input.cnpj)],
-    ["domain", "domain", normalizeDomain(input.website)],
+    ["domain", "domain", siteDomain(input.website)],
     ["phone", "phone_normalized", normalizePhone(input.phone)],
     [
       "name+address",
@@ -203,7 +203,7 @@ export async function updateCompanyEnrichmentRepository(
         capital: fields.capital ?? current.capital,
         address: current.address ?? fields.address ?? null,
         website,
-        domain: current.domain ?? normalizeDomain(website),
+        domain: current.domain ?? siteDomain(website),
         phone,
         phone_normalized:
           current.phone_normalized ?? normalizePhone(phone),

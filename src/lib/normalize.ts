@@ -34,6 +34,45 @@ export function normalizeDomain(
   }
 }
 
+/**
+ * Hosts de plataformas: um "site" nesses endereços é, na verdade, um
+ * perfil/link de terceiros. Nunca servem como domínio para deduplicar
+ * (senão duas empresas diferentes com Instagram virariam "duplicadas").
+ */
+const GENERIC_HOSTS = new Set([
+  "instagram.com", "facebook.com", "fb.com", "fb.me",
+  "linkedin.com", "youtube.com", "youtu.be", "tiktok.com", "twitter.com",
+  "x.com", "wa.me", "whatsapp.com", "api.whatsapp.com", "web.whatsapp.com",
+  "linktr.ee", "linkin.bio", "beacons.ai", "bio.link", "lnk.bio",
+  "google.com", "goo.gl", "g.page", "maps.app.goo.gl", "bit.ly", "tinyurl.com",
+]);
+
+/** Plataformas cujos subdomínios (pt-br.facebook.com...) são o mesmo host. */
+const SOCIAL_ROOTS = [
+  "instagram.com", "facebook.com", "linkedin.com", "tiktok.com",
+  "youtube.com", "whatsapp.com", "google.com",
+];
+
+export function isGenericHost(
+  url: string | null | undefined,
+): boolean {
+  const domain = normalizeDomain(url);
+
+  if (!domain) return false;
+
+  return (
+    GENERIC_HOSTS.has(domain) ||
+    SOCIAL_ROOTS.some((root) => domain.endsWith(`.${root}`))
+  );
+}
+
+/** Domínio próprio do negócio; null se for rede social/link de terceiros. */
+export function siteDomain(
+  url: string | null | undefined,
+): string | null {
+  return isGenericHost(url) ? null : normalizeDomain(url);
+}
+
 /** Telefone BR só com dígitos, sem DDI 55. Null se curto demais. */
 export function normalizePhone(
   phone: string | null | undefined,
@@ -79,6 +118,13 @@ export function isMobilePhone(normalized: string | null): boolean {
 }
 
 /** Extrai o número de links do WhatsApp (wa.me, api/web.whatsapp.com...). */
+/** wa.me/message/XXXX (link de conversa sem número visível). */
+export function whatsappMessageId(href: string): string | null {
+  const match = href.match(/wa\.me\/message\/([A-Za-z0-9]+)/i);
+
+  return match ? match[1] : null;
+}
+
 export function whatsappNumberFromUrl(href: string): string | null {
   try {
     const url = new URL(href.startsWith("whatsapp:") ? href.replace("whatsapp://", "https://wa.example/") : href);
@@ -96,7 +142,7 @@ export function whatsappNumberFromUrl(href: string): string | null {
 }
 
 const JUNK_EMAIL =
-  /(\.(png|jpe?g|gif|svg|webp|css|js)$|^(no-?reply|noreply|donotreply)@|@(example|sentry|wixpress|domain|email)\.)/i;
+  /(\.(png|jpe?g|gif|svg|webp|css|js)$|^(no-?reply|noreply|donotreply)@|@(example|domain|email|seuemail|seudominio)\.|sentry|wixpress|wix\.com|godaddy|cloudflare|^[0-9a-f]{16,}@|u003e|%20)/i;
 
 export function normalizeEmail(
   value: string | null | undefined,
@@ -116,11 +162,11 @@ export type SocialKind =
   | "TIKTOK";
 
 const RESERVED: Record<SocialKind, string[]> = {
-  INSTAGRAM: ["p", "reel", "reels", "explore", "accounts", "stories", "tv", "share"],
-  FACEBOOK: ["sharer", "sharer.php", "plugins", "tr", "dialog", "share", "share.php", "login", "groups", "events", "watch"],
-  LINKEDIN: ["share", "sharing", "feed", "login", "signup"],
-  YOUTUBE: ["watch", "embed", "playlist", "results", "feed", "shorts"],
-  TIKTOK: ["video", "tag", "discover"],
+  INSTAGRAM: ["p", "reel", "reels", "explore", "accounts", "stories", "tv", "share", "blog", "about", "legal", "privacy", "help", "press", "developer", "developers", "directory", "web", "direct", "meta", "instagram", "whatsapp", "wix", "wordpress", "elementor", "canva", "google", "shopify", "hotmart", "facebook", "threads", "download"],
+  FACEBOOK: ["sharer", "sharer.php", "plugins", "tr", "dialog", "share", "share.php", "login", "groups", "events", "watch", "docs", "policies", "help", "business", "pages", "public", "legal", "about", "privacy", "ads", "marketplace", "gaming", "facebook", "meta", "wixportugues", "wix", "wordpress", "elementor", "canva", "google", "whatsapp", "instagram", "reg", "recover", "r.php", "l.php", "home.php", "permalink.php", "photo", "photo.php", "story.php", "hashtag", "people", "stories", "reel"],
+  LINKEDIN: ["share", "sharing", "feed", "login", "signup", "linkedin", "legal", "help"],
+  YOUTUBE: ["watch", "embed", "playlist", "results", "feed", "shorts", "youtube"],
+  TIKTOK: ["video", "tag", "discover", "tiktok", "legal"],
 };
 
 /** Perfil canônico de uma rede social a partir de um link; null se não for um perfil. */

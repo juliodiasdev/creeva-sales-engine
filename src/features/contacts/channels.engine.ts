@@ -1,9 +1,11 @@
 import {
+  isGenericHost,
   isMobilePhone,
   normalizeDomain,
   normalizeEmail,
   normalizePhone,
   socialProfile,
+  whatsappMessageId,
   whatsappNumberFromUrl,
 } from "../../lib/normalize";
 
@@ -61,8 +63,28 @@ export function buildChannels(
     out.push(c);
   };
 
-  // 1) WhatsApp confirmado no site
-  for (const link of facts?.whatsappLinks ?? []) {
+  // O "site" cadastrado pode ser, na verdade, um perfil social ou link de
+  // WhatsApp: vira canal próprio e NÃO conta como site da empresa.
+  const rawWebsite = company.website?.trim() || null;
+  const websiteIsGeneric = !!rawWebsite && isGenericHost(rawWebsite);
+
+  const extraLinks = websiteIsGeneric && rawWebsite ? [rawWebsite] : [];
+
+  // 1) WhatsApp confirmado no site (ou link wa.me cadastrado como site)
+  for (const link of [...(facts?.whatsappLinks ?? []), ...extraLinks]) {
+    const messageId = whatsappMessageId(link);
+
+    if (messageId) {
+      add({
+        kind: "WHATSAPP",
+        value: `msg/${messageId}`,
+        url: `https://wa.me/message/${messageId}`,
+        label: "link de conversa",
+        source: link === rawWebsite ? "GOOGLE_PLACES" : "WEBSITE",
+      });
+      continue;
+    }
+
     const number = whatsappNumberFromUrl(link);
 
     if (number) {
@@ -123,6 +145,7 @@ export function buildChannels(
 
   // 4) redes sociais (site + campo instagram do cadastro)
   const socialLinks = [
+    ...extraLinks,
     ...Object.values(facts?.socialLinks ?? {}),
     ...(company.instagram ? [company.instagram] : []),
   ];
@@ -138,13 +161,18 @@ export function buildChannels(
         value: profile.handle,
         url: profile.url,
         label: null,
-        source: link === company.instagram ? "MANUAL" : "WEBSITE",
+        source:
+          link === company.instagram
+            ? "MANUAL"
+            : link === rawWebsite
+              ? "GOOGLE_PLACES"
+              : "WEBSITE",
       });
     }
   }
 
   // 5) site
-  const domain = normalizeDomain(company.website);
+  const domain = websiteIsGeneric ? null : normalizeDomain(company.website);
 
   if (domain && company.website) {
     add({
@@ -181,6 +209,10 @@ export function channelOpenUrl(
 ): string {
   switch (channel.kind) {
     case "WHATSAPP":
+      if (channel.value.startsWith("msg/")) {
+        return `https://wa.me/message/${channel.value.slice(4)}`;
+      }
+
       return `https://wa.me/55${channel.value}${
         message ? `?text=${encodeURIComponent(message)}` : ""
       }`;

@@ -15,7 +15,8 @@ export type SettingKey =
   | "proposal_follow_up_days"
   | "seller_name"
   | "company_name"
-  | "openai_model";
+  | "openai_model"
+  | "data_repairs";
 
 export const DEFAULTS: Partial<Record<SettingKey, string>> = {
   follow_up_delay_days: "2",
