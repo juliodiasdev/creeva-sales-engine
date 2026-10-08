@@ -1,4 +1,4 @@
-import { getDatabase } from "../../lib/database";
+import { getSupabase, unwrap } from "../../lib/store";
 
 import { getCompanyRepository } from "../companies/company.repository";
 
@@ -106,25 +106,17 @@ export async function analyzeCompany(
 
   const analysis = validateAnalysis(json);
 
-  const db = await getDatabase();
-
-  await db.execute(
-    `
-      INSERT INTO ai_analyses
-        (company_id, summary, main_problem, opportunity,
-         recommended_offer, outreach_angle, confidence, model)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-    `,
-    [
-      companyId,
-      analysis.summary,
-      analysis.main_problem,
-      analysis.opportunity,
-      analysis.recommended_offer,
-      analysis.outreach_angle,
-      analysis.confidence,
+  unwrap(
+    await getSupabase().from("ai_analyses").insert({
+      company_id: companyId,
+      summary: analysis.summary,
+      main_problem: analysis.main_problem,
+      opportunity: analysis.opportunity,
+      recommended_offer: analysis.recommended_offer,
+      outreach_angle: analysis.outreach_angle,
+      confidence: analysis.confidence,
       model,
-    ],
+    }),
   );
 
   return (await getLatestAnalysis(companyId))!;
@@ -133,12 +125,14 @@ export async function analyzeCompany(
 export async function getLatestAnalysis(
   companyId: number,
 ): Promise<StoredAnalysis | null> {
-  const db = await getDatabase();
-
-  const rows = await db.select<StoredAnalysis[]>(
-    `SELECT * FROM ai_analyses WHERE company_id = $1 ORDER BY id DESC LIMIT 1`,
-    [companyId],
-  );
+  const rows = unwrap(
+    await getSupabase()
+      .from("ai_analyses")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("id", { ascending: false })
+      .limit(1),
+  ) as StoredAnalysis[];
 
   return rows[0] ?? null;
 }

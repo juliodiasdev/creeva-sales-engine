@@ -1,6 +1,12 @@
 import {
-  getDatabase,
-} from "../../lib/database";
+  fetchAllPages,
+  fetchByIds,
+  getSupabase,
+  inDaysIso,
+  nowIso,
+  startOfTodayIso,
+  unwrap,
+} from "../../lib/store";
 
 import type {
   Task,
@@ -17,70 +23,51 @@ export async function createTaskRepository(
   dueInDays?: number,
   priority: TaskPriority = "NORMAL",
 ): Promise<void> {
-  const db = await getDatabase();
-
-  // due_at usa datetime() do SQLite (UTC), mesmo formato de CURRENT_TIMESTAMP.
-  await db.execute(
-    `
-      INSERT INTO tasks (
-        prospect_id,
+  unwrap(
+    await getSupabase()
+      .from("tasks")
+      .insert({
+        prospect_id: prospectId,
         type,
         title,
         priority,
-        due_at
-      )
-
-      VALUES (
-        $1,
-        $2,
-        $3,
-        $5,
-        CASE
-          WHEN $4 IS NULL THEN NULL
-          ELSE datetime('now', '+' || $4 || ' days')
-        END
-      )
-    `,
-    [
-      prospectId,
-      type,
-      title,
-      dueInDays ?? null,
-      priority,
-    ],
+        due_at:
+          dueInDays === undefined ? null : inDaysIso(dueInDays),
+      }),
   );
 }
 
 export async function getTaskRepository(
   taskId: number,
 ): Promise<Task | null> {
-  const db = await getDatabase();
-
-  const rows = await db.select<Task[]>(
-    `SELECT * FROM tasks WHERE id = $1`,
-    [taskId],
-  );
-
-  return rows[0] ?? null;
+  return unwrap(
+    await getSupabase()
+      .from("tasks")
+      .select("*")
+      .eq("id", taskId)
+      .maybeSingle(),
+  ) as Task | null;
 }
 
 export async function listTasksByProspectRepository(
   prospectId: number,
 ): Promise<Task[]> {
-  const db = await getDatabase();
+  const tasks = unwrap(
+    await getSupabase()
+      .from("tasks")
+      .select("*")
+      .eq("prospect_id", prospectId),
+  ) as Task[];
 
-  return db.select<Task[]>(
-    `
-      SELECT *
-      FROM tasks
-      WHERE prospect_id = $1
-      ORDER BY
-        completed_at IS NOT NULL,
-        due_at ASC,
-        id ASC
-    `,
-    [prospectId],
-  );
+  // Abertas primeiro, depois por vencimento e id.
+  return tasks.sort((a, b) => {
+    const open = Number(!!a.completed_at) - Number(!!b.completed_at);
+    if (open) return open;
+    return (
+      (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999") ||
+      a.id - b.id
+    );
+  });
 }
 
 /**
@@ -91,20 +78,16 @@ export async function completeTaskRepository(
   taskId: number,
   outcome: TaskOutcome = "DONE",
 ): Promise<boolean> {
-  const db = await getDatabase();
+  const rows = unwrap(
+    await getSupabase()
+      .from("tasks")
+      .update({ completed_at: nowIso(), outcome })
+      .eq("id", taskId)
+      .is("completed_at", null)
+      .select("id"),
+  ) as { id: number }[];
 
-  const result = await db.execute(
-    `
-      UPDATE tasks
-      SET completed_at = datetime('now'),
-          outcome = $2
-      WHERE id = $1
-        AND completed_at IS NULL
-    `,
-    [taskId, outcome],
-  );
-
-  return result.rowsAffected > 0;
+  return rows.length > 0;
 }
 
 /** Cancela tasks abertas do prospect (ex.: respondeu, ganhou, perdeu). */
@@ -112,97 +95,107 @@ export async function cancelOpenTasksRepository(
   prospectId: number,
   types?: TaskType[],
 ): Promise<void> {
-  const db = await getDatabase();
+  let query = getSupabase()
+    .from("tasks")
+    .update({ completed_at: nowIso(), outcome: "CANCELED" })
+    .eq("prospect_id", prospectId)
+    .is("completed_at", null);
 
-  const filter = types?.length
-    ? `AND type IN (${types
-        .map((_, i) => `$${i + 2}`)
-        .join(", ")})`
-    : "";
+  if (types?.length) query = query.in("type", types);
 
-  await db.execute(
-    `
-      UPDATE tasks
-      SET completed_at = datetime('now'),
-          outcome = 'CANCELED'
-      WHERE prospect_id = $1
-        AND completed_at IS NULL
-        ${filter}
-    `,
-    [prospectId, ...(types ?? [])],
-  );
+  unwrap(await query);
 }
 
 export async function rescheduleTaskRepository(
   taskId: number,
   days: number,
 ): Promise<boolean> {
-  const db = await getDatabase();
+  const rows = unwrap(
+    await getSupabase()
+      .from("tasks")
+      .update({ due_at: inDaysIso(days) })
+      .eq("id", taskId)
+      .is("completed_at", null)
+      .select("id"),
+  ) as { id: number }[];
 
-  const result = await db.execute(
-    `
-      UPDATE tasks
-      SET due_at = datetime('now', '+' || $2 || ' days')
-      WHERE id = $1
-        AND completed_at IS NULL
-    `,
-    [taskId, days],
-  );
-
-  return result.rowsAffected > 0;
+  return rows.length > 0;
 }
+
+const PRIORITY_RANK: Record<string, number> = {
+  HIGH: 1,
+  NORMAL: 2,
+  LOW: 3,
+};
 
 /**
  * Today: abertas, sem data ou já vencidas.
  * Ordem: atrasadas, prioridade, score, mais antigas.
  */
-export async function listPendingTasksRepository():
-Promise<TaskWithProspect[]> {
-  const db = await getDatabase();
+export async function listPendingTasksRepository(): Promise<
+  TaskWithProspect[]
+> {
+  const now = nowIso();
 
-  return db.select<TaskWithProspect[]>(`
-    SELECT
-      t.*,
+  const tasks = await fetchAllPages<Task>((from, to) =>
+    getSupabase()
+      .from("tasks")
+      .select("*")
+      .is("completed_at", null)
+      .or(`due_at.is.null,due_at.lte.${now}`)
+      .order("id", { ascending: true })
+      .range(from, to) as never,
+  );
 
-      c.name AS company_name,
+  if (tasks.length === 0) return [];
 
-      p.status AS prospect_status,
+  const prospects = await fetchByIds<{
+    id: number;
+    company_id: number;
+    status: string;
+    score: number;
+  }>(
+    "prospects",
+    "id,company_id,status,score",
+    "id",
+    tasks.map((t) => Number(t.prospect_id)),
+  );
 
-      p.score AS prospect_score,
+  const companies = await fetchByIds<{ id: number; name: string }>(
+    "companies",
+    "id,name",
+    "id",
+    prospects.map((p) => Number(p.company_id)),
+  );
 
-      CASE
-        WHEN t.due_at IS NOT NULL
-         AND date(t.due_at) < date('now')
-        THEN 1 ELSE 0
-      END AS is_overdue
+  const prospectById = new Map(prospects.map((p) => [Number(p.id), p]));
+  const companyById = new Map(companies.map((c) => [Number(c.id), c]));
+  const todayStart = startOfTodayIso();
 
-    FROM tasks t
+  return tasks
+    .flatMap((t): TaskWithProspect[] => {
+      const prospect = prospectById.get(Number(t.prospect_id));
 
-    INNER JOIN prospects p
-      ON p.id = t.prospect_id
+      if (!prospect) return [];
 
-    INNER JOIN companies c
-      ON c.id = p.company_id
-
-    WHERE t.completed_at IS NULL
-      AND (
-        t.due_at IS NULL
-        OR t.due_at <= datetime('now')
-      )
-
-    ORDER BY
-      is_overdue DESC,
-
-      CASE
-        WHEN t.priority = 'HIGH' THEN 1
-        WHEN t.priority = 'NORMAL' THEN 2
-        ELSE 3
-      END,
-
-      p.score DESC,
-
-      t.created_at ASC,
-
-      t.id ASC
-  `);
+      return [
+        {
+          ...t,
+          company_name:
+            companyById.get(Number(prospect.company_id))?.name ?? "—",
+          prospect_status: prospect.status,
+          prospect_score: Number(prospect.score),
+          is_overdue: t.due_at && t.due_at < todayStart ? 1 : 0,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        b.is_overdue - a.is_overdue ||
+        (PRIORITY_RANK[a.priority] ?? 3) -
+          (PRIORITY_RANK[b.priority] ?? 3) ||
+        b.prospect_score - a.prospect_score ||
+        a.created_at.localeCompare(b.created_at) ||
+        a.id - b.id,
+    );
 }

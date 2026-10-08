@@ -1,4 +1,4 @@
-import { getDatabase } from "../../lib/database";
+import { fetchAllPages, getSupabase } from "../../lib/store";
 
 export interface DashboardMetrics {
   companiesDiscovered: number;
@@ -20,19 +20,60 @@ export interface DashboardMetrics {
 
 const ratio = (a: number, b: number) => (b > 0 ? a / b : 0);
 
-/** Somente dados reais, calculados do SQLite. */
+/** Somente dados reais, calculados do banco. */
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
-  const db = await getDatabase();
+  const supabase = getSupabase();
 
-  const one = async (sql: string): Promise<number> => {
-    const rows = await db.select<{ n: number | null }[]>(sql);
-    return Number(rows[0]?.n ?? 0);
+  const count = async (table: string): Promise<number> => {
+    const { count: n, error } = await supabase
+      .from(table)
+      .select("id", { count: "exact", head: true });
+
+    if (error) throw new Error(error.message);
+
+    return n ?? 0;
   };
 
-  const distinct = (type: string) =>
-    one(
-      `SELECT COUNT(DISTINCT prospect_id) AS n FROM activities WHERE type = '${type}'`,
+  const countWhere = async (
+    table: string,
+    column: string,
+    values: string[],
+  ): Promise<number> => {
+    const { count: n, error } = await supabase
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .in(column, values);
+
+    if (error) throw new Error(error.message);
+
+    return n ?? 0;
+  };
+
+  const distinctProspects = async (type: string): Promise<number> => {
+    const rows = await fetchAllPages<{ prospect_id: number }>(
+      (from, to) =>
+        supabase
+          .from("activities")
+          .select("prospect_id")
+          .eq("type", type)
+          .range(from, to) as never,
     );
+
+    return new Set(rows.map((r) => Number(r.prospect_id))).size;
+  };
+
+  const deals = await fetchAllPages<{ status: string; value: number }>(
+    (from, to) =>
+      supabase
+        .from("deals")
+        .select("status,value")
+        .range(from, to) as never,
+  );
+
+  const sum = (status: string) =>
+    deals
+      .filter((d) => d.status === status)
+      .reduce((total, d) => total + Number(d.value), 0);
 
   const [
     companiesDiscovered,
@@ -42,23 +83,20 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     replies,
     meetings,
     proposals,
-    won,
     lost,
-    pipelineValue,
-    revenue,
   ] = await Promise.all([
-    one(`SELECT COUNT(*) AS n FROM companies`),
-    one(`SELECT COUNT(*) AS n FROM companies WHERE lead_status IN ('QUALIFIED','READY')`),
-    one(`SELECT COUNT(*) AS n FROM prospects`),
-    distinct("MESSAGE_SENT"),
-    distinct("REPLY_RECEIVED"),
-    distinct("MEETING"),
-    distinct("PROPOSAL_SENT"),
-    one(`SELECT COUNT(*) AS n FROM deals WHERE status = 'WON'`),
-    one(`SELECT COUNT(*) AS n FROM prospects WHERE status = 'LOST'`),
-    one(`SELECT SUM(value) AS n FROM deals WHERE status = 'OPEN'`),
-    one(`SELECT SUM(value) AS n FROM deals WHERE status = 'WON'`),
+    count("companies"),
+    countWhere("companies", "lead_status", ["QUALIFIED", "READY"]),
+    count("prospects"),
+    distinctProspects("MESSAGE_SENT"),
+    distinctProspects("REPLY_RECEIVED"),
+    distinctProspects("MEETING"),
+    distinctProspects("PROPOSAL_SENT"),
+    countWhere("prospects", "status", ["LOST"]),
   ]);
+
+  const won = deals.filter((d) => d.status === "WON").length;
+  const revenue = sum("WON");
 
   return {
     companiesDiscovered,
@@ -73,7 +111,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     replyRate: ratio(replies, contactsSent),
     meetingRate: ratio(meetings, contactsSent),
     closeRate: ratio(won, won + lost),
-    pipelineValue,
+    pipelineValue: sum("OPEN"),
     revenue,
     averageTicket: ratio(revenue, won),
   };

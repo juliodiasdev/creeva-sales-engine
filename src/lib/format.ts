@@ -33,8 +33,17 @@ export function errorMessage(
 ): string {
   if (err instanceof Error) return err.message;
 
-  // tauri-plugin-sql rejeita com string, não com Error.
   if (typeof err === "string" && err) return err;
+
+  // Erros do Supabase/PostgREST chegam como objeto { message }.
+  if (
+    err &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
 
   return fallback;
 }

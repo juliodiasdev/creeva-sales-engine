@@ -1,4 +1,8 @@
-import { getDatabase } from "../../lib/database";
+import {
+  getSupabase,
+  nowIso,
+  unwrap,
+} from "../../lib/store";
 
 import {
   buildDedupeKey,
@@ -14,41 +18,40 @@ import type {
   SourceType,
 } from "./company.types";
 
+
 export async function createCompanyRepository(
   input: CreateCompanyInput,
 ): Promise<number> {
-  const db = await getDatabase();
+  const row = unwrap(
+    await getSupabase()
+      .from("companies")
+      .insert({
+        name: input.name,
+        segment: input.segment ?? null,
+        city: input.city ?? null,
+        state: input.state ?? null,
+        website: input.website ?? null,
+        phone: input.phone ?? null,
+        instagram: input.instagram ?? null,
+        google_place_id: input.googlePlaceId ?? null,
+        cnpj: normalizeCnpj(input.cnpj),
+        address: input.address ?? null,
+        category: input.category ?? null,
+        rating: input.rating ?? null,
+        reviews_count: input.reviewsCount ?? null,
+        domain: normalizeDomain(input.website),
+        phone_normalized: normalizePhone(input.phone),
+        dedupe_key: buildDedupeKey(
+          input.name,
+          input.address,
+          input.city,
+        ),
+      })
+      .select("id")
+      .single(),
+  ) as { id: number };
 
-  const result = await db.execute(
-    `
-      INSERT INTO companies (
-        name, segment, city, state, website, phone, instagram,
-        google_place_id, cnpj, address, category, rating,
-        reviews_count, domain, phone_normalized, dedupe_key
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-    `,
-    [
-      input.name,
-      input.segment ?? null,
-      input.city ?? null,
-      input.state ?? null,
-      input.website ?? null,
-      input.phone ?? null,
-      input.instagram ?? null,
-      input.googlePlaceId ?? null,
-      normalizeCnpj(input.cnpj),
-      input.address ?? null,
-      input.category ?? null,
-      input.rating ?? null,
-      input.reviewsCount ?? null,
-      normalizeDomain(input.website),
-      normalizePhone(input.phone),
-      buildDedupeKey(input.name, input.address, input.city),
-    ],
-  );
-
-  return Number(result.lastInsertId);
+  return Number(row.id);
 }
 
 /**
@@ -58,21 +61,11 @@ export async function createCompanyRepository(
 export async function findDuplicateCompanyRepository(
   input: CreateCompanyInput,
 ): Promise<{ id: number; matchedBy: string } | null> {
-  const db = await getDatabase();
-
   const checks: [string, string, unknown][] = [
-    [
-      "google_place_id",
-      "google_place_id",
-      input.googlePlaceId || null,
-    ],
+    ["google_place_id", "google_place_id", input.googlePlaceId || null],
     ["cnpj", "cnpj", normalizeCnpj(input.cnpj)],
     ["domain", "domain", normalizeDomain(input.website)],
-    [
-      "phone",
-      "phone_normalized",
-      normalizePhone(input.phone),
-    ],
+    ["phone", "phone_normalized", normalizePhone(input.phone)],
     [
       "name+address",
       "dedupe_key",
@@ -83,13 +76,16 @@ export async function findDuplicateCompanyRepository(
   for (const [label, column, value] of checks) {
     if (!value) continue;
 
-    const rows = await db.select<{ id: number }[]>(
-      `SELECT id FROM companies WHERE ${column} = $1 LIMIT 1`,
-      [value],
-    );
+    const rows = unwrap(
+      await getSupabase()
+        .from("companies")
+        .select("id")
+        .eq(column, value)
+        .limit(1),
+    ) as { id: number }[];
 
     if (rows[0]) {
-      return { id: rows[0].id, matchedBy: label };
+      return { id: Number(rows[0].id), matchedBy: label };
     }
   }
 
@@ -99,41 +95,36 @@ export async function findDuplicateCompanyRepository(
 export async function getCompanyRepository(
   id: number,
 ): Promise<Company | null> {
-  const db = await getDatabase();
-
-  const rows = await db.select<Company[]>(
-    `SELECT * FROM companies WHERE id = $1`,
-    [id],
-  );
-
-  return rows[0] ?? null;
+  return unwrap(
+    await getSupabase()
+      .from("companies")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle(),
+  ) as Company | null;
 }
 
 export async function listCompaniesRepository(
   limit = 200,
   offset = 0,
 ): Promise<Company[]> {
-  const db = await getDatabase();
-
-  return db.select<Company[]>(
-    `
-      SELECT *
-      FROM companies
-      ORDER BY id DESC
-      LIMIT $1 OFFSET $2
-    `,
-    [limit, offset],
-  );
+  return unwrap(
+    await getSupabase()
+      .from("companies")
+      .select("*")
+      .order("id", { ascending: false })
+      .range(offset, offset + limit - 1),
+  ) as Company[];
 }
 
 export async function countCompaniesRepository(): Promise<number> {
-  const db = await getDatabase();
+  const { count, error } = await getSupabase()
+    .from("companies")
+    .select("id", { count: "exact", head: true });
 
-  const rows = await db.select<{ n: number }[]>(
-    `SELECT COUNT(*) AS n FROM companies`,
-  );
+  if (error) throw new Error(error.message);
 
-  return rows[0]?.n ?? 0;
+  return count ?? 0;
 }
 
 export async function addCompanySourceRepository(
@@ -142,19 +133,15 @@ export async function addCompanySourceRepository(
   sourceId?: string,
   raw?: unknown,
 ): Promise<void> {
-  const db = await getDatabase();
-
-  await db.execute(
-    `
-      INSERT INTO company_sources (company_id, source_type, source_id, raw_data)
-      VALUES ($1, $2, $3, $4)
-    `,
-    [
-      companyId,
-      type,
-      sourceId ?? null,
-      raw === undefined ? null : JSON.stringify(raw),
-    ],
+  unwrap(
+    await getSupabase()
+      .from("company_sources")
+      .insert({
+        company_id: companyId,
+        source_type: type,
+        source_id: sourceId ?? null,
+        raw_data: raw === undefined ? null : JSON.stringify(raw),
+      }),
   );
 }
 
@@ -163,17 +150,15 @@ export async function setLeadStatusRepository(
   status: LeadStatus,
   reason?: string,
 ): Promise<void> {
-  const db = await getDatabase();
-
-  await db.execute(
-    `
-      UPDATE companies
-      SET lead_status = $2,
-          disqualified_reason = $3,
-          updated_at = datetime('now')
-      WHERE id = $1
-    `,
-    [companyId, status, reason ?? null],
+  unwrap(
+    await getSupabase()
+      .from("companies")
+      .update({
+        lead_status: status,
+        disqualified_reason: reason ?? null,
+        updated_at: nowIso(),
+      })
+      .eq("id", companyId),
   );
 }
 
@@ -195,57 +180,51 @@ export async function updateCompanyEnrichmentRepository(
     >
   >,
 ): Promise<void> {
-  const db = await getDatabase();
+  const current = await getCompanyRepository(companyId);
 
-  // COALESCE: nunca apaga dado já conhecido nem inventa dado ausente;
-  // endereço/site/telefone já cadastrados têm precedência.
-  await db.execute(
-    `
-      UPDATE companies SET
-        cnpj = COALESCE($2, cnpj),
-        legal_name = COALESCE($3, legal_name),
-        cnae = COALESCE($4, cnae),
-        company_size = COALESCE($5, company_size),
-        registration_status = COALESCE($6, registration_status),
-        opened_at = COALESCE($7, opened_at),
-        capital = COALESCE($8, capital),
-        address = COALESCE(address, $9),
-        website = COALESCE(website, $10),
-        domain = COALESCE(domain, $11),
-        phone = COALESCE(phone, $12),
-        phone_normalized = COALESCE(phone_normalized, $13),
-        updated_at = datetime('now')
-      WHERE id = $1
-    `,
-    [
-      companyId,
-      normalizeCnpj(fields.cnpj),
-      fields.legal_name ?? null,
-      fields.cnae ?? null,
-      fields.company_size ?? null,
-      fields.registration_status ?? null,
-      fields.opened_at ?? null,
-      fields.capital ?? null,
-      fields.address ?? null,
-      fields.website ?? null,
-      normalizeDomain(fields.website),
-      fields.phone ?? null,
-      normalizePhone(fields.phone),
-    ],
+  if (!current) throw new Error("Empresa não encontrada.");
+
+  // Dados do CNPJ vencem; endereço/site/telefone já cadastrados têm
+  // precedência. Nunca apaga dado conhecido nem inventa dado ausente.
+  const website = current.website ?? fields.website ?? null;
+  const phone = current.phone ?? fields.phone ?? null;
+
+  unwrap(
+    await getSupabase()
+      .from("companies")
+      .update({
+        cnpj: normalizeCnpj(fields.cnpj) ?? current.cnpj,
+        legal_name: fields.legal_name ?? current.legal_name,
+        cnae: fields.cnae ?? current.cnae,
+        company_size: fields.company_size ?? current.company_size,
+        registration_status:
+          fields.registration_status ?? current.registration_status,
+        opened_at: fields.opened_at ?? current.opened_at,
+        capital: fields.capital ?? current.capital,
+        address: current.address ?? fields.address ?? null,
+        website,
+        domain: current.domain ?? normalizeDomain(website),
+        phone,
+        phone_normalized:
+          current.phone_normalized ?? normalizePhone(phone),
+        updated_at: nowIso(),
+      })
+      .eq("id", companyId),
   );
 }
-
 
 export async function listCompanyIdsByLeadStatusRepository(
   status: LeadStatus,
   limit: number,
 ): Promise<number[]> {
-  const db = await getDatabase();
+  const rows = unwrap(
+    await getSupabase()
+      .from("companies")
+      .select("id")
+      .eq("lead_status", status)
+      .order("id", { ascending: false })
+      .limit(limit),
+  ) as { id: number }[];
 
-  const rows = await db.select<{ id: number }[]>(
-    `SELECT id FROM companies WHERE lead_status = $1 ORDER BY id DESC LIMIT $2`,
-    [status, limit],
-  );
-
-  return rows.map((r) => r.id);
+  return rows.map((r) => Number(r.id));
 }

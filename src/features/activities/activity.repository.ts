@@ -1,6 +1,4 @@
-import {
-  getDatabase,
-} from "../../lib/database";
+import { getSupabase, unwrap } from "../../lib/store";
 
 import type {
   Activity,
@@ -14,27 +12,16 @@ export async function createActivityRepository(
   channel?: string,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
-  const db = await getDatabase();
-
-  await db.execute(
-    `
-      INSERT INTO activities (
-        prospect_id,
+  unwrap(
+    await getSupabase()
+      .from("activities")
+      .insert({
+        prospect_id: prospectId,
         type,
-        content,
-        channel,
-        metadata
-      )
-
-      VALUES ($1, $2, $3, $4, $5)
-    `,
-    [
-      prospectId,
-      type,
-      content ?? null,
-      channel ?? null,
-      metadata ? JSON.stringify(metadata) : null,
-    ],
+        content: content ?? null,
+        channel: channel ?? null,
+        metadata: metadata ? JSON.stringify(metadata) : null,
+      }),
   );
 }
 
@@ -42,17 +29,14 @@ export async function listActivitiesRepository(
   prospectId: number,
   limit = 200,
 ): Promise<Activity[]> {
-  const db = await getDatabase();
-
-  // id como desempate: occurred_at tem resolução de 1 segundo.
-  return db.select<Activity[]>(
-    `
-      SELECT *
-      FROM activities
-      WHERE prospect_id = $1
-      ORDER BY occurred_at ASC, id ASC
-      LIMIT $2
-    `,
-    [prospectId, limit],
-  );
+  // id como desempate: occurred_at pode empatar.
+  return unwrap(
+    await getSupabase()
+      .from("activities")
+      .select("*")
+      .eq("prospect_id", prospectId)
+      .order("occurred_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(limit),
+  ) as Activity[];
 }

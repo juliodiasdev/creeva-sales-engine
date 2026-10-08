@@ -1,25 +1,32 @@
 import { DatabaseSync } from "node:sqlite";
 
-import { runMigrations } from "../lib/migrations";
-import type { Db } from "../lib/database";
+import { runMigrations } from "./sqliteSchema";
+import { createFakeSupabase } from "./fakeSupabase";
+import type { Db } from "./dbTypes";
 
-/** Banco SQLite em memória com a mesma interface do plugin Tauri. */
+/** Cliente fake do Supabase da base de teste atual (usado nos vi.mock). */
+let currentClient: ReturnType<typeof createFakeSupabase> | null = null;
+
+export function testClient() {
+  if (!currentClient) throw new Error("banco de teste não criado");
+  return currentClient;
+}
+
+/** SQLite em memória + cliente fake; `db` serve para asserções em SQL. */
 export function createTestDb(): Db {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec("PRAGMA foreign_keys = ON");
 
-  // O plugin usa $1,$2...; o node:sqlite aceita ?1,?2...
-  const convert = (sql: string) =>
-    sql.replace(/\$(\d+)/g, "?$1");
+  currentClient = createFakeSupabase(sqlite);
+
+  const convert = (sql: string) => sql.replace(/\$(\d+)/g, "?$1");
 
   const bind = (params: unknown[] = []) =>
     params.map((p) => (p === undefined ? null : p)) as never[];
 
   return {
     async execute(sql, params) {
-      const result = sqlite
-        .prepare(convert(sql))
-        .run(...bind(params));
+      const result = sqlite.prepare(convert(sql)).run(...bind(params));
 
       return {
         rowsAffected: Number(result.changes),
@@ -28,9 +35,7 @@ export function createTestDb(): Db {
     },
 
     async select<T>(sql: string, params?: unknown[]) {
-      return sqlite
-        .prepare(convert(sql))
-        .all(...bind(params)) as T;
+      return sqlite.prepare(convert(sql)).all(...bind(params)) as T;
     },
   };
 }

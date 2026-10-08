@@ -21,6 +21,8 @@ import {
   listProspects,
 } from "../features/prospects/prospect.service";
 
+import { DuplicatesPanel } from "../features/duplicates/DuplicatesPanel";
+
 import { ErrorMessage } from "../components/ErrorMessage";
 
 function messageOf(
@@ -152,6 +154,8 @@ export function CompaniesPage({ onOpenCompany }: Props) {
 
   return (
     <>
+      <DuplicatesPanel onChanged={() => void load()} />
+
       <section className="panel">
         <div className="panel-title">
           <div>

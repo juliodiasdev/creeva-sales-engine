@@ -1,6 +1,9 @@
 import {
-  getDatabase,
-} from "../../lib/database";
+  getSupabase,
+  inDaysIso,
+  nowIso,
+  unwrap,
+} from "../../lib/store";
 
 import type {
   Deal,
@@ -11,17 +14,15 @@ import type {
 export async function getOpenDealRepository(
   prospectId: number,
 ): Promise<Deal | null> {
-  const db = await getDatabase();
-
-  const rows = await db.select<Deal[]>(
-    `
-      SELECT * FROM deals
-      WHERE prospect_id = $1 AND status = 'OPEN'
-      ORDER BY id DESC
-      LIMIT 1
-    `,
-    [prospectId],
-  );
+  const rows = unwrap(
+    await getSupabase()
+      .from("deals")
+      .select("*")
+      .eq("prospect_id", prospectId)
+      .eq("status", "OPEN")
+      .order("id", { ascending: false })
+      .limit(1),
+  ) as Deal[];
 
   return rows[0] ?? null;
 }
@@ -29,52 +30,43 @@ export async function getOpenDealRepository(
 export async function listDealsRepository(
   prospectId?: number,
 ): Promise<Deal[]> {
-  const db = await getDatabase();
+  let query = getSupabase()
+    .from("deals")
+    .select("*")
+    .order("id", { ascending: false });
 
-  return db.select<Deal[]>(
-    `
-      SELECT * FROM deals
-      WHERE $1 IS NULL OR prospect_id = $1
-      ORDER BY id DESC
-    `,
-    [prospectId ?? null],
-  );
+  if (prospectId !== undefined) {
+    query = query.eq("prospect_id", prospectId);
+  }
+
+  return unwrap(await query) as Deal[];
 }
 
-export async function createDealRepository(
-  input: {
-    prospectId: number;
-    title: string;
-    serviceType?: string;
-    value: number;
-    expectedCloseInDays?: number;
-  },
-): Promise<number> {
-  const db = await getDatabase();
+export async function createDealRepository(input: {
+  prospectId: number;
+  title: string;
+  serviceType?: string;
+  value: number;
+  expectedCloseInDays?: number;
+}): Promise<number> {
+  const row = unwrap(
+    await getSupabase()
+      .from("deals")
+      .insert({
+        prospect_id: input.prospectId,
+        title: input.title,
+        service_type: input.serviceType ?? null,
+        value: input.value,
+        expected_close_at:
+          input.expectedCloseInDays === undefined
+            ? null
+            : inDaysIso(input.expectedCloseInDays),
+      })
+      .select("id")
+      .single(),
+  ) as { id: number };
 
-  const result = await db.execute(
-    `
-      INSERT INTO deals (
-        prospect_id, title, service_type, value, expected_close_at
-      )
-      VALUES (
-        $1, $2, $3, $4,
-        CASE
-          WHEN $5 IS NULL THEN NULL
-          ELSE datetime('now', '+' || $5 || ' days')
-        END
-      )
-    `,
-    [
-      input.prospectId,
-      input.title,
-      input.serviceType ?? null,
-      input.value,
-      input.expectedCloseInDays ?? null,
-    ],
-  );
-
-  return Number(result.lastInsertId);
+  return Number(row.id);
 }
 
 export async function updateOpenDealValueRepository(
@@ -82,17 +74,15 @@ export async function updateOpenDealValueRepository(
   value: number,
   serviceType?: string,
 ): Promise<void> {
-  const db = await getDatabase();
+  const values: Record<string, unknown> = {
+    value,
+    updated_at: nowIso(),
+  };
 
-  await db.execute(
-    `
-      UPDATE deals
-      SET value = $2,
-          service_type = COALESCE($3, service_type),
-          updated_at = datetime('now')
-      WHERE id = $1
-    `,
-    [dealId, value, serviceType ?? null],
+  if (serviceType) values.service_type = serviceType;
+
+  unwrap(
+    await getSupabase().from("deals").update(values).eq("id", dealId),
   );
 }
 
@@ -106,117 +96,94 @@ export async function closeDealRepository(
     lostReason?: string;
   } = {},
 ): Promise<void> {
-  const db = await getDatabase();
+  const values: Record<string, unknown> = {
+    status,
+    closed_at: nowIso(),
+    probability: status === "WON" ? 100 : 0,
+    recurring: extra.recurring ? 1 : 0,
+    lost_reason: extra.lostReason ?? null,
+    updated_at: nowIso(),
+  };
 
-  await db.execute(
-    `
-      UPDATE deals
-      SET status = $2,
-          closed_at = datetime('now'),
-          probability = CASE WHEN $2 = 'WON' THEN 100 ELSE 0 END,
-          value = COALESCE($3, value),
-          service_type = COALESCE($4, service_type),
-          recurring = $5,
-          lost_reason = $6,
-          updated_at = datetime('now')
-      WHERE id = $1
-    `,
-    [
-      dealId,
-      status,
-      extra.value ?? null,
-      extra.serviceType ?? null,
-      extra.recurring ? 1 : 0,
-      extra.lostReason ?? null,
-    ],
+  if (extra.value !== undefined) values.value = extra.value;
+  if (extra.serviceType) values.service_type = extra.serviceType;
+
+  unwrap(
+    await getSupabase().from("deals").update(values).eq("id", dealId),
   );
 }
 
-export async function createMeetingRepository(
-  input: {
-    prospectId: number;
-    scheduledAt: string;
-    notes?: string;
-    need?: string;
-    budget?: string;
-    decisionMaker?: string;
-    timeline?: string;
-  },
-): Promise<void> {
-  const db = await getDatabase();
+export async function createMeetingRepository(input: {
+  prospectId: number;
+  scheduledAt: string;
+  notes?: string;
+  need?: string;
+  budget?: string;
+  decisionMaker?: string;
+  timeline?: string;
+}): Promise<void> {
+  const when = new Date(input.scheduledAt.replace(" ", "T"));
 
-  await db.execute(
-    `
-      INSERT INTO meetings (
-        prospect_id, scheduled_at, notes, need,
-        budget, decision_maker, timeline
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `,
-    [
-      input.prospectId,
-      input.scheduledAt,
-      input.notes ?? null,
-      input.need ?? null,
-      input.budget ?? null,
-      input.decisionMaker ?? null,
-      input.timeline ?? null,
-    ],
+  unwrap(
+    await getSupabase()
+      .from("meetings")
+      .insert({
+        prospect_id: input.prospectId,
+        scheduled_at: Number.isNaN(when.getTime())
+          ? input.scheduledAt
+          : when.toISOString(),
+        notes: input.notes ?? null,
+        need: input.need ?? null,
+        budget: input.budget ?? null,
+        decision_maker: input.decisionMaker ?? null,
+        timeline: input.timeline ?? null,
+      }),
   );
 }
 
 export async function listMeetingsRepository(
   prospectId: number,
 ): Promise<Meeting[]> {
-  const db = await getDatabase();
-
-  return db.select<Meeting[]>(
-    `SELECT * FROM meetings WHERE prospect_id = $1 ORDER BY scheduled_at DESC`,
-    [prospectId],
-  );
+  return unwrap(
+    await getSupabase()
+      .from("meetings")
+      .select("*")
+      .eq("prospect_id", prospectId)
+      .order("scheduled_at", { ascending: false }),
+  ) as Meeting[];
 }
 
-export async function createProposalRepository(
-  input: {
-    dealId: number;
-    prospectId: number;
-    value: number;
-    description?: string;
-    validDays?: number;
-  },
-): Promise<void> {
-  const db = await getDatabase();
-
-  await db.execute(
-    `
-      INSERT INTO proposals (
-        deal_id, prospect_id, value, description, valid_until
-      )
-      VALUES (
-        $1, $2, $3, $4,
-        CASE
-          WHEN $5 IS NULL THEN NULL
-          ELSE datetime('now', '+' || $5 || ' days')
-        END
-      )
-    `,
-    [
-      input.dealId,
-      input.prospectId,
-      input.value,
-      input.description ?? null,
-      input.validDays ?? null,
-    ],
+export async function createProposalRepository(input: {
+  dealId: number;
+  prospectId: number;
+  value: number;
+  description?: string;
+  validDays?: number;
+}): Promise<void> {
+  unwrap(
+    await getSupabase()
+      .from("proposals")
+      .insert({
+        deal_id: input.dealId,
+        prospect_id: input.prospectId,
+        value: input.value,
+        description: input.description ?? null,
+        valid_until:
+          input.validDays === undefined
+            ? null
+            : inDaysIso(input.validDays),
+      }),
   );
 }
 
 export async function listProposalsRepository(
   prospectId: number,
 ): Promise<Proposal[]> {
-  const db = await getDatabase();
-
-  return db.select<Proposal[]>(
-    `SELECT * FROM proposals WHERE prospect_id = $1 ORDER BY id DESC`,
-    [prospectId],
-  );
+  return unwrap(
+    await getSupabase()
+      .from("proposals")
+      .select("*")
+      .eq("prospect_id", prospectId)
+      .order("id", { ascending: false }),
+  ) as Proposal[];
 }

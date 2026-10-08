@@ -1,4 +1,4 @@
-import { getDatabase } from "../../lib/database";
+import { getSupabase, nowIso, unwrap } from "../../lib/store";
 
 export const SECRET_KEYS = [
   "google_api_key",
@@ -32,14 +32,15 @@ export function isSecret(key: string): boolean {
 export async function getSetting(
   key: SettingKey,
 ): Promise<string | null> {
-  const db = await getDatabase();
+  const row = unwrap(
+    await getSupabase()
+      .from("settings")
+      .select("value")
+      .eq("key", key)
+      .maybeSingle(),
+  ) as { value: string } | null;
 
-  const rows = await db.select<{ value: string }[]>(
-    `SELECT value FROM settings WHERE key = $1`,
-    [key],
-  );
-
-  return rows[0]?.value ?? DEFAULTS[key] ?? null;
+  return row?.value ?? DEFAULTS[key] ?? null;
 }
 
 export async function getNumberSetting(
@@ -48,47 +49,42 @@ export async function getNumberSetting(
 ): Promise<number> {
   const value = Number(await getSetting(key));
 
-  return Number.isFinite(value) && value >= 0
-    ? value
-    : fallback;
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 export async function setSetting(
   key: SettingKey,
   value: string,
 ): Promise<void> {
-  const db = await getDatabase();
-
+  const supabase = getSupabase();
   const trimmed = value.trim();
 
   if (!trimmed) {
-    await db.execute(`DELETE FROM settings WHERE key = $1`, [key]);
+    unwrap(await supabase.from("settings").delete().eq("key", key));
     return;
   }
 
-  await db.execute(
-    `
-      INSERT INTO settings (key, value) VALUES ($1, $2)
-      ON CONFLICT(key) DO UPDATE
-      SET value = excluded.value, updated_at = datetime('now')
-    `,
-    [key, trimmed],
+  unwrap(
+    await supabase
+      .from("settings")
+      .upsert(
+        { key, value: trimmed, updated_at: nowIso() },
+        { onConflict: "key" },
+      ),
   );
 }
 
 /**
- * Valores para a UI: segredos nunca saem do banco,
+ * Valores para a UI: segredos nunca são exibidos,
  * só informamos se estão configurados.
  */
 export async function getPublicSettings(): Promise<{
   values: Record<string, string>;
   configured: Record<string, boolean>;
 }> {
-  const db = await getDatabase();
-
-  const rows = await db.select<
-    { key: string; value: string }[]
-  >(`SELECT key, value FROM settings`);
+  const rows = unwrap(
+    await getSupabase().from("settings").select("key,value"),
+  ) as { key: string; value: string }[];
 
   const values: Record<string, string> = {};
   const configured: Record<string, boolean> = {};

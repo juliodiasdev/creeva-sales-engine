@@ -138,10 +138,9 @@ export async function prepareAiOutreach(
  * FIRST_CONTACT: READY -> CONTACTED, cria FOLLOW_UP (D+2).
  * FOLLOW_UP: registra o envio sem alterar o estágio.
  *
- * Observação: tauri-plugin-sql usa pool de conexões, então
- * BEGIN/COMMIT em chamadas separadas não é confiável. A ordem
- * abaixo torna o fluxo seguro contra duplo clique (a conclusão
- * da task é o guard) e o primeiro passo é o que impede reexecução.
+ * Observação: o cliente do Supabase não oferece transações multi-etapa.
+ * A ordem abaixo torna o fluxo seguro contra duplo clique (a conclusão
+ * da task é o guard e vem primeiro) e cada passo é reexecutável.
  */
 export async function markTaskAsSent(
   taskId: number,

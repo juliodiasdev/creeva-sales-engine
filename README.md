@@ -10,13 +10,13 @@ This template should help get you started developing with Tauri, React and Types
 
 # Creava Sales Engine
 
-Aplicativo desktop local-first de prospecção comercial (Tauri 2 + React + SQLite).
+Aplicativo desktop de prospecção comercial (Tauri 2 + React + Supabase), com login único e dados compartilhados na nuvem.
 
 ## Instalar (usuários)
 
 Baixe o instalador `.exe` mais recente em **Releases** e execute-o. O Windows pode exibir o aviso do SmartScreen: clique em **Mais informações → Executar assim mesmo**.
 
-Cada instalação tem o seu próprio banco local e as suas próprias chaves de API (Settings). Para mover dados entre computadores use **Settings → Exportar/Importar backup**.
+Todos os computadores que entrarem com o mesmo login veem os mesmos dados. Configuração do banco: [docs/SETUP-SUPABASE.md](docs/SETUP-SUPABASE.md).
 
 ## Desenvolvimento
 

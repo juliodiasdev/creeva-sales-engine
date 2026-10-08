@@ -7,13 +7,14 @@ import {
 } from "vitest";
 
 import { createMigratedTestDb } from "../../test/testDb";
-import type { Db } from "../../lib/database";
+import type { Db } from "../../test/dbTypes";
 
 let db: Db;
 
-vi.mock("../../lib/database", () => ({
-  getDatabase: async () => db,
-}));
+vi.mock("../../lib/supabase", async () => {
+  const { testClient } = await import("../../test/testDb");
+  return { getSupabase: () => testClient() };
+});
 
 import { createCompany } from "../companies/company.service";
 import { createProspect } from "../prospects/prospect.service";
