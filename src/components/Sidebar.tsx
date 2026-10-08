@@ -129,7 +129,7 @@ export function Sidebar({
           <strong>CREAVA</strong>
 
           <span className="eyebrow">
-            CENTRAL DE VENDAS
+            DIGITAL · AGÊNCIA
           </span>
         </div>
       </div>

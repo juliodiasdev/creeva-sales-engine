@@ -8,7 +8,7 @@ This template should help get you started developing with Tauri, React and Types
 
 ---
 
-# Creava Sales Engine
+# Creava Digital - Agência
 
 Aplicativo desktop de prospecção comercial (Tauri 2 + React + Supabase), com login único e dados compartilhados na nuvem.
 

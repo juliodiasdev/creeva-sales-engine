@@ -55,7 +55,7 @@ export function validateBackup(raw: unknown): BackupFile {
   const file = raw as Partial<BackupFile> | null;
 
   if (!file || file.format !== BACKUP_FORMAT) {
-    throw new Error("Arquivo não é um backup do Creava Sales Engine.");
+    throw new Error("Arquivo não é um backup deste aplicativo.");
   }
 
   if (

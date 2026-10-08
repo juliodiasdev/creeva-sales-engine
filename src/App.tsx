@@ -231,7 +231,7 @@ function App() {
     return (
       <main className="app">
         <img className="loading-logo" src={logo} alt="Creava" />
-        <p>Inicializando Creava Sales Engine...</p>
+        <p>Abrindo Creava Digital - Agência...</p>
       </main>
     );
   }

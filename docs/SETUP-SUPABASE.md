@@ -1,6 +1,6 @@
 # Configurar o banco na nuvem (Supabase) — uma vez só
 
-O Creava Sales Engine guarda tudo no Supabase (Postgres) e tem **um único login**.
+O aplicativo Creava Digital - Agência guarda tudo no Supabase (Postgres) e tem **um único login**.
 Quem entrar com esse login vê todos os contatos, prospects e histórico, em qualquer computador.
 
 ## 1. Criar o projeto
