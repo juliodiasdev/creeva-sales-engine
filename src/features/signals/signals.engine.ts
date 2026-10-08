@@ -1,3 +1,4 @@
+import { isGenericHost } from "../../lib/normalize";
 import type { Company } from "../companies/company.types";
 import type { WebsiteFacts } from "../enrichment/website.facts";
 
@@ -36,11 +37,15 @@ export function deriveSignals(
 ): Signal[] {
   const signals: Signal[] = [];
 
-  if (!company.website) {
+  const hasOwnSite = !!company.website && !isGenericHost(company.website);
+
+  if (!hasOwnSite) {
     signals.push({
       type: "NO_WEBSITE",
-      value: null,
-      evidence: "Nenhum website cadastrado/encontrado para a empresa.",
+      value: company.website,
+      evidence: company.website
+        ? `O único "site" cadastrado é um perfil/link de terceiros (${company.website}), não um site próprio.`
+        : "Nenhum website cadastrado/encontrado para a empresa.",
       source: "GOOGLE_PLACES",
       confidence: 0.8,
     });

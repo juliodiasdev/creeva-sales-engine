@@ -1,5 +1,6 @@
 import { getSupabase } from "./supabase";
 import { ensurePlaybookSeed } from "../features/playbook/playbook.service";
+import { runRepairsOnce } from "../features/maintenance/repair.service";
 import { ensureServicesSeed } from "../features/services/services.service";
 
 /** Verifica se o schema existe e prepara dados iniciais. */
@@ -25,4 +26,7 @@ export async function initApp(): Promise<void> {
 
   await ensurePlaybookSeed();
   await ensureServicesSeed();
+
+  // Corrige dados de versões anteriores (uma vez só). Não bloqueia o app.
+  await runRepairsOnce().catch((err) => console.error("reparos", err));
 }

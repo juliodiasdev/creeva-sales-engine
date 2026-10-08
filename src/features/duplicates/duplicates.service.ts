@@ -7,7 +7,7 @@ import {
 
 import {
   buildDedupeKey,
-  normalizeDomain,
+  siteDomain,
   normalizePhone,
 } from "../../lib/normalize";
 
@@ -275,7 +275,7 @@ export async function mergeCompanies(
       .from("companies")
       .update({
         ...filled,
-        domain: normalizeDomain(website),
+        domain: siteDomain(website),
         phone_normalized: normalizePhone(phone),
         dedupe_key: buildDedupeKey(
           master.name,

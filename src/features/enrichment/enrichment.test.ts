@@ -70,7 +70,7 @@ describe("facts → signals → score", () => {
   });
 
   it("emits signals only with evidence, none for website when no facts", () => {
-    const none = deriveSignals({ website: "https://x.com", rating: null, reviews_count: null }, null, 2026);
+    const none = deriveSignals({ website: "https://exemplo.com.br", rating: null, reviews_count: null }, null, 2026);
     expect(none).toHaveLength(0);
 
     const bad = extractWebsiteFacts(HTML_BAD, { url: "http://b.com", finalUrl: "http://b.com" });
