@@ -28,6 +28,7 @@ import { matchServices } from "../services/offers.engine";
 import { listServices } from "../services/services.service";
 import type { ServiceKey } from "../services/services.service";
 
+import { planCompanyWithAi } from "../ai/ai.service";
 import { crawlWebsite } from "./website.crawler";
 import type { WebsiteFacts } from "./website.facts";
 
@@ -43,6 +44,8 @@ export interface EnrichOptions {
   crawlSite: boolean;
   /** Gerar sinais, score, serviços sugeridos e abordagens (sem IA). */
   analyze: boolean;
+  /** Plano com IA (OpenAI): 1 chamada por empresa. Opcional e pago. */
+  ai?: boolean;
 }
 
 export const DEFAULT_ENRICH_OPTIONS: EnrichOptions = {
@@ -172,6 +175,15 @@ export function startEnrichmentJob(
     for (const [i, id] of companyIds.entries()) {
       try {
         outcomes[id] = await enrichCompany(id, crawlWebsite, options);
+
+        if (options.ai) {
+          // Falha da IA não desfaz o enriquecimento determinístico.
+          try {
+            await planCompanyWithAi(id);
+          } catch (err) {
+            outcomes[id] = `${err instanceof Error ? err.message : "erro"} (IA)`;
+          }
+        }
       } catch (err) {
         outcomes[id] = err instanceof Error ? err.message : "erro";
       }

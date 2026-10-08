@@ -6,6 +6,8 @@ import type {
   OutreachDraft,
 } from "./outreach.types";
 
+import { ChannelButtons } from "../contacts/ChannelButtons";
+
 interface Props {
   draft: OutreachDraft;
 
@@ -92,6 +94,17 @@ export function OutreachPanel({
           setCopied(false);
         }}
       />
+
+      {draft.channels.length > 0 && (
+        <div>
+          <small>Abrir com a mensagem pronta:</small>
+          <ChannelButtons
+            channels={draft.channels}
+            message={message}
+            subject={`Contato — ${draft.companyName}`}
+          />
+        </div>
+      )}
 
       <div className="outreach-actions">
         <button
