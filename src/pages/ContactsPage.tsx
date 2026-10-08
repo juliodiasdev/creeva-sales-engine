@@ -8,7 +8,7 @@ import type { ContactListItem } from "../features/contacts/contacts.service";
 import { ChannelButtons } from "../features/contacts/ChannelButtons";
 
 import { EnrichDialog } from "../features/enrichment/EnrichDialog";
-import { loadContactRows } from "../features/export/export.service";
+import { loadExportData } from "../features/export/export.service";
 import { downloadCsv, downloadXlsx } from "../features/export/download";
 
 import { label, LEAD_STATUS_LABEL } from "../lib/labels";
@@ -62,14 +62,14 @@ export function ContactsPage({
     try {
       setError("");
       setBusy(kind);
-      const rows = await loadContactRows();
+      const data = await loadExportData();
 
       const path =
-        kind === "xlsx" ? await downloadXlsx(rows) : await downloadCsv(rows);
+        kind === "xlsx" ? await downloadXlsx(data) : await downloadCsv(data);
 
       setMessage(
         path
-          ? `Planilha salva (${rows.length} empresa(s)): ${path}`
+          ? `Planilha salva (${data.companies.length} empresa(s)): ${path}`
           : "Exportação cancelada.",
       );
     } catch (err) {
