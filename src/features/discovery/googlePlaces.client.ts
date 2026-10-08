@@ -33,6 +33,8 @@ export interface GooglePlace {
   rating?: number;
   userRatingCount?: number;
   primaryTypeDisplayName?: { text?: string };
+  /** Resultado da API legada: telefone/site ainda não buscados. */
+  legacy?: boolean;
 }
 
 /** Converte um resultado do Google em dados de Company (não vira Prospect). */
@@ -101,7 +103,7 @@ export async function describeGoogleError(
 
 /** Faz uma busca mínima só para validar chave, API e faturamento. */
 export async function testGooglePlacesConnection(): Promise<string> {
-  const places = await searchPlaces("restaurante", "São Paulo", 1, 1);
+  const places = await searchPlaces("restaurante em São Paulo", 1, 1);
 
   return `Conexão OK: a API respondeu (${places.length} resultado de teste).`;
 }
@@ -152,6 +154,7 @@ export function legacyToPlace(
       : undefined,
     websiteUri: details?.website,
     nationalPhoneNumber: details?.formatted_phone_number,
+    legacy: !details,
   };
 }
 
@@ -188,12 +191,14 @@ async function legacyGet(
   return data;
 }
 
+/**
+ * Busca na API legada SEM detalhes (mais barata). Telefone e site são
+ * buscados depois, só para lugares realmente novos (completePlace).
+ */
 export async function searchPlacesLegacy(
   apiKey: string,
-  segment: string,
-  city: string,
+  query: string,
   maxPages: number,
-  withDetails = true,
 ): Promise<GooglePlace[]> {
   const places: GooglePlace[] = [];
   let pageToken: string | undefined;
@@ -208,32 +213,11 @@ export async function searchPlacesLegacy(
       "textsearch",
       pageToken
         ? { pagetoken: pageToken, key: apiKey }
-        : {
-            query: `${segment} em ${city}`,
-            language: "pt-BR",
-            key: apiKey,
-          },
+        : { query, language: "pt-BR", key: apiKey },
     );
 
     for (const r of data.results ?? []) {
-      let details: LegacyResponse["result"];
-
-      if (withDetails) {
-        try {
-          details = (
-            await legacyGet("details", {
-              place_id: r.place_id,
-              fields: "website,formatted_phone_number",
-              language: "pt-BR",
-              key: apiKey,
-            })
-          ).result;
-        } catch {
-          // Sem contato para este resultado; segue com os demais.
-        }
-      }
-
-      places.push(legacyToPlace(r, details));
+      places.push(legacyToPlace(r));
     }
 
     pageToken = data.next_page_token;
@@ -244,10 +228,41 @@ export async function searchPlacesLegacy(
   return places;
 }
 
+/** Busca telefone e site de um lugar da API legada (1 chamada). */
+export async function completePlace(
+  place: GooglePlace,
+): Promise<GooglePlace> {
+  if (!place.legacy) return place;
+
+  const apiKey = await getSetting("google_api_key");
+
+  if (!apiKey) return place;
+
+  try {
+    const details = (
+      await legacyGet("details", {
+        place_id: place.id,
+        fields: "website,formatted_phone_number",
+        language: "pt-BR",
+        key: apiKey,
+      })
+    ).result;
+
+    return {
+      ...place,
+      websiteUri: details?.website,
+      nationalPhoneNumber: details?.formatted_phone_number,
+      legacy: false,
+    };
+  } catch {
+    // Sem contato para este resultado; segue com os dados da busca.
+    return { ...place, legacy: false };
+  }
+}
+
 async function searchPlacesNew(
   apiKey: string,
-  segment: string,
-  city: string,
+  query: string,
   maxPages = 1,
   pageSize = 20,
 ): Promise<GooglePlace[]> {
@@ -264,7 +279,7 @@ async function searchPlacesNew(
           FIELD_MASK + ",nextPageToken",
       },
       body: JSON.stringify({
-        textQuery: `${segment} em ${city}`,
+        textQuery: query,
         languageCode: "pt-BR",
         pageSize,
         ...(pageToken ? { pageToken } : {}),
@@ -300,8 +315,7 @@ async function searchPlacesNew(
  * ativada ou bloqueada na chave), usa a Places API legada.
  */
 export async function searchPlaces(
-  segment: string,
-  city: string,
+  query: string,
   maxPages = 1,
   pageSize = 20,
 ): Promise<GooglePlace[]> {
@@ -314,24 +328,12 @@ export async function searchPlaces(
   }
 
   try {
-    return await searchPlacesNew(
-      apiKey,
-      segment,
-      city,
-      maxPages,
-      pageSize,
-    );
+    return await searchPlacesNew(apiKey, query, maxPages, pageSize);
   } catch (err) {
     const text = err instanceof Error ? err.message : "";
 
     if (!text.includes("(403)")) throw err;
 
-    return searchPlacesLegacy(
-      apiKey,
-      segment,
-      city,
-      maxPages,
-      pageSize > 1,
-    );
+    return searchPlacesLegacy(apiKey, query, maxPages);
   }
 }

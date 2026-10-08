@@ -15,6 +15,7 @@ vi.mock("../../lib/http", () => ({ httpFetch: (...a: unknown[]) => httpFetch(...
 
 import { setSetting } from "../settings/settings.service";
 import {
+  completePlace,
   parseCityState,
   placeToCompanyInput,
   searchPlaces,
@@ -54,8 +55,11 @@ describe("google places", () => {
       return json(200, { status: "OK", result: { website: "https://auto.com.br", formatted_phone_number: "(65) 3333-1111" } });
     });
 
-    const places = await searchPlaces("loja de carros", "Cuiabá");
-    expect(places).toHaveLength(1);
+    const found = await searchPlaces("loja de carros em Cuiabá");
+    expect(found).toHaveLength(1);
+    // a busca legada é barata: telefone/site só vêm depois, para lugares novos
+    expect(found[0].websiteUri).toBeUndefined();
+    const places = [await completePlace(found[0])];
 
     const company = placeToCompanyInput(places[0], "loja de carros")!;
     expect(company).toMatchObject({
@@ -70,11 +74,11 @@ describe("google places", () => {
         ? json(403, {})
         : json(200, { status: "REQUEST_DENIED", error_message: "API not enabled" }),
     );
-    await expect(searchPlaces("x", "y")).rejects.toThrow(/REQUEST_DENIED/);
+    await expect(searchPlaces("x y")).rejects.toThrow(/REQUEST_DENIED/);
 
     httpFetch.mockReset();
     httpFetch.mockResolvedValue(json(429, {}));
-    await expect(searchPlaces("x", "y")).rejects.toThrow(/429/);
+    await expect(searchPlaces("x y")).rejects.toThrow(/429/);
     expect(httpFetch).toHaveBeenCalledTimes(1);
   });
 });

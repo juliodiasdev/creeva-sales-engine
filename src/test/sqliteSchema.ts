@@ -243,6 +243,67 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 4,
+    name: "services_channels_approaches",
+    statements: [
+      `ALTER TABLE ai_analyses ADD COLUMN recommended_services TEXT`,
+      `CREATE TABLE services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        pain_points TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        sort INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`,
+      `CREATE TABLE company_channels (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        value TEXT NOT NULL,
+        url TEXT,
+        label TEXT,
+        source TEXT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (company_id, kind, value),
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE company_approaches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        channel TEXT NOT NULL,
+        service_key TEXT,
+        angle TEXT NOT NULL,
+        message TEXT NOT NULL,
+        evidence_used TEXT,
+        source TEXT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE seen_places (
+        google_place_id TEXT PRIMARY KEY,
+        company_id INTEGER,
+        times_seen INTEGER NOT NULL DEFAULT 1,
+        first_seen_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        last_seen_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+      )`,
+      `CREATE TABLE discovery_searches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        query_key TEXT NOT NULL UNIQUE,
+        segment TEXT NOT NULL,
+        city TEXT NOT NULL,
+        neighborhood TEXT,
+        pages INTEGER NOT NULL DEFAULT 1,
+        runs INTEGER NOT NULL DEFAULT 1,
+        last_found INTEGER NOT NULL DEFAULT 0,
+        last_imported INTEGER NOT NULL DEFAULT 0,
+        last_run_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(

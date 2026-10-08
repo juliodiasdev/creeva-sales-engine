@@ -8,7 +8,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
   website_snapshots: ["id","company_id","url","facts","fetched_at"],
   signals: ["id","company_id","type","value","evidence","source","confidence","created_at"],
   company_scores: ["id","company_id","fit","need","capacity","intent","total","confidence","reasons","created_at"],
-  ai_analyses: ["id","company_id","summary","main_problem","opportunity","recommended_offer","outreach_angle","confidence","model","created_at"],
+  ai_analyses: ["id","company_id","summary","main_problem","opportunity","recommended_offer","outreach_angle","confidence","model","recommended_services","created_at"],
   prospects: ["id","company_id","status","priority","score","next_action","next_action_at","qualification_notes","lost_reason","closed_at","created_at","updated_at"],
   tasks: ["id","prospect_id","type","title","description","priority","due_at","completed_at","outcome","created_at"],
   activities: ["id","prospect_id","type","channel","content","metadata","occurred_at"],
@@ -16,6 +16,11 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
   meetings: ["id","prospect_id","scheduled_at","notes","need","budget","decision_maker","timeline","created_at"],
   proposals: ["id","deal_id","prospect_id","value","description","sent_at","valid_until","created_at"],
   playbook_scripts: ["id","segment","kind","title","body","created_at"],
+  services: ["id","key","name","description","pain_points","active","sort","created_at"],
+  company_channels: ["id","company_id","kind","value","url","label","source","created_at"],
+  company_approaches: ["id","company_id","channel","service_key","angle","message","evidence_used","source","created_at"],
+  seen_places: ["google_place_id","company_id","times_seen","first_seen_at","last_seen_at"],
+  discovery_searches: ["id","query_key","segment","city","neighborhood","pages","runs","last_found","last_imported","last_run_at"],
   settings: ["key","value","updated_at"],
   jobs: ["id","type","status","progress","error","result","created_at","started_at","finished_at"],
   api_usage: ["id","provider","operation","requests","tokens","estimated_cost","created_at"],
@@ -25,6 +30,9 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
 export const TABLE_ORDER = [
   "companies",
   "company_sources",
+  "company_channels",
+  "company_approaches",
+  "seen_places",
   "website_snapshots",
   "signals",
   "company_scores",
@@ -36,9 +44,19 @@ export const TABLE_ORDER = [
   "meetings",
   "proposals",
   "playbook_scripts",
+  "services",
   "settings",
   "jobs",
   "api_usage",
+  "discovery_searches",
 ] as const;
+
+/** Tabelas cuja chave primária não é `id`. */
+export const PRIMARY_KEY: Record<string, string> = {
+  settings: "key",
+  seen_places: "google_place_id",
+};
+
+export const pkOf = (table: string): string => PRIMARY_KEY[table] ?? "id";
 
 export const SECRET_SETTING_KEYS = ["google_api_key", "openai_api_key"];

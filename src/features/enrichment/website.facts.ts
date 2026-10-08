@@ -1,5 +1,7 @@
 import * as cheerio from "cheerio";
 
+import { normalizeEmail, socialProfile } from "../../lib/normalize";
+
 export interface WebsiteFacts {
   url: string;
   finalUrl: string | null;
@@ -13,6 +15,8 @@ export interface WebsiteFacts {
 
   linkCount: number;
   phones: string[];
+  emails: string[];
+  contactPageUrl: string | null;
   whatsappLinks: string[];
   ctas: string[];
   formsCount: number;
@@ -24,14 +28,6 @@ export interface WebsiteFacts {
 
 const CTA_PATTERN =
   /(agende|agendar|agendamento|or[cç]amento|fale conosco|fale com|entre em contato|solicite|solicitar|reserv|comprar|whatsapp|chame)/i;
-
-const SOCIAL_HOSTS: Record<string, RegExp> = {
-  instagram: /instagram\.com/i,
-  facebook: /facebook\.com/i,
-  linkedin: /linkedin\.com/i,
-  youtube: /youtube\.com/i,
-  tiktok: /tiktok\.com/i,
-};
 
 const PHONE_PATTERN =
   /(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g;
@@ -86,7 +82,9 @@ export function extractWebsiteFacts(
   const whatsappLinks: string[] = [];
   const socialLinks: Record<string, string> = {};
   const phones = new Set<string>();
+  const emails = new Set<string>();
   const ctas = new Set<string>();
+  let contactPageUrl: string | null = null;
 
   $("a[href]").each((_, el) => {
     const href = ($(el).attr("href") ?? "").trim();
@@ -100,10 +98,32 @@ export function extractWebsiteFacts(
       phones.add(href.slice(4).trim());
     }
 
-    for (const [name, re] of Object.entries(SOCIAL_HOSTS)) {
-      if (re.test(href) && !socialLinks[name]) {
-        socialLinks[name] = href;
+    if (href.toLowerCase().startsWith("mailto:")) {
+      const email = normalizeEmail(href);
+
+      if (email) emails.add(email);
+    }
+
+    if (
+      !contactPageUrl &&
+      /(contato|contact|fale-?conosco|atendimento)/i.test(`${href} ${text}`) &&
+      !/^(mailto:|tel:|javascript:|#)/i.test(href)
+    ) {
+      try {
+        const resolved = new URL(href, finalUrl);
+
+        if (resolved.hostname === new URL(finalUrl).hostname) {
+          contactPageUrl = resolved.toString();
+        }
+      } catch {
+        // href inválido
       }
+    }
+
+    const profile = socialProfile(href);
+
+    if (profile && !socialLinks[profile.kind.toLowerCase()]) {
+      socialLinks[profile.kind.toLowerCase()] = profile.url;
     }
 
     if (text && text.length <= 60 && CTA_PATTERN.test(text)) {
@@ -129,6 +149,12 @@ export function extractWebsiteFacts(
     .slice(0, 5)
     .forEach((p) => phones.add(p.trim()));
 
+  (bodyText.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? [])
+    .map((e) => normalizeEmail(e))
+    .filter((e): e is string => !!e)
+    .slice(0, 10)
+    .forEach((e) => emails.add(e));
+
   const copyright = bodyText.match(
     /(?:©|&copy;|copyright)\s*(?:\w+\s*)?(\d{4})/i,
   );
@@ -148,6 +174,8 @@ export function extractWebsiteFacts(
 
     linkCount: $("a[href]").length,
     phones: [...phones].slice(0, 5),
+    emails: [...emails].slice(0, 5),
+    contactPageUrl,
     whatsappLinks: whatsappLinks.slice(0, 3),
     ctas: [...ctas].slice(0, 8),
     formsCount: $("form").length,
@@ -177,6 +205,8 @@ export function failedWebsiteFacts(
     headings: [],
     linkCount: 0,
     phones: [],
+    emails: [],
+    contactPageUrl: null,
     whatsappLinks: [],
     ctas: [],
     formsCount: 0,
@@ -184,5 +214,23 @@ export function failedWebsiteFacts(
     copyrightYear: null,
     hasViewport: false,
     technologies: [],
+  };
+}
+
+/** Junta fatos da página de contato aos da página inicial. */
+export function mergeWebsiteFacts(
+  home: WebsiteFacts,
+  extra: WebsiteFacts,
+): WebsiteFacts {
+  const union = (a: string[], b: string[]) => [...new Set([...a, ...b])];
+
+  return {
+    ...home,
+    phones: union(home.phones, extra.phones).slice(0, 8),
+    emails: union(home.emails, extra.emails).slice(0, 8),
+    whatsappLinks: union(home.whatsappLinks, extra.whatsappLinks).slice(0, 5),
+    ctas: union(home.ctas, extra.ctas).slice(0, 10),
+    formsCount: Math.max(home.formsCount, extra.formsCount),
+    socialLinks: { ...extra.socialLinks, ...home.socialLinks },
   };
 }

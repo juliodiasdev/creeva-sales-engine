@@ -4,6 +4,7 @@ import {
   SECRET_SETTING_KEYS,
   TABLE_COLUMNS,
   TABLE_ORDER,
+  pkOf,
 } from "../../lib/tables";
 
 import { deleteAllRows, resetSequences } from "./reset.service";
@@ -11,7 +12,7 @@ import { deleteAllRows, resetSequences } from "./reset.service";
 export const BACKUP_FORMAT = "creava-sales-engine-backup";
 
 /** Versão do formato. Backups de versões anteriores continuam válidos. */
-export const BACKUP_SCHEMA_VERSION = 4;
+export const BACKUP_SCHEMA_VERSION = 5;
 
 export interface BackupFile {
   format: typeof BACKUP_FORMAT;
@@ -25,7 +26,7 @@ export async function exportBackup(): Promise<BackupFile> {
   const tables: BackupFile["tables"] = {};
 
   for (const table of TABLE_ORDER) {
-    const order = table === "settings" ? "key" : "id";
+    const order = pkOf(table);
 
     tables[table] = await fetchAllPages<Record<string, unknown>>(
       (from, to) =>

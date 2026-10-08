@@ -1,19 +1,24 @@
 import { getSupabase, unwrap } from "../../lib/store";
-import { SECRET_SETTING_KEYS, TABLE_ORDER } from "../../lib/tables";
+import { SECRET_SETTING_KEYS, TABLE_ORDER, pkOf } from "../../lib/tables";
 import { ensurePlaybookSeed } from "../playbook/playbook.service";
+import { ensureServicesSeed } from "../services/services.service";
+
+// Configuração (playbook, serviços, settings) não é "dado de teste".
+const CONFIG_TABLES = ["settings", "playbook_scripts", "services"];
 
 const BUSINESS_TABLES = TABLE_ORDER.filter(
-  (t) => t !== "settings" && t !== "playbook_scripts",
+  (t) => !CONFIG_TABLES.includes(t),
 );
 
-/** PostgREST exige um filtro em DELETE; todas as tabelas têm id >= 1. */
+/** PostgREST exige um filtro em DELETE: usamos um que casa com tudo. */
 export async function deleteAllRows(table: string): Promise<void> {
   const supabase = getSupabase();
+  const pk = pkOf(table);
 
   unwrap(
-    table === "settings"
-      ? await supabase.from(table).delete().neq("key", "")
-      : await supabase.from(table).delete().gte("id", 0),
+    pk === "id"
+      ? await supabase.from(table).delete().gte("id", 0)
+      : await supabase.from(table).delete().neq(pk, ""),
   );
 }
 
@@ -47,7 +52,9 @@ export async function resetEverything(): Promise<void> {
 
   await deleteAllRows("settings");
   await deleteAllRows("playbook_scripts");
+  await deleteAllRows("services");
 
   await ensurePlaybookSeed();
+  await ensureServicesSeed();
   await resetSequences();
 }

@@ -4,6 +4,7 @@ import { recordApiUsage } from "../jobs/apiUsage.service";
 import {
   extractWebsiteFacts,
   failedWebsiteFacts,
+  mergeWebsiteFacts,
 } from "./website.facts";
 
 import type { WebsiteFacts } from "./website.facts";
@@ -15,15 +16,9 @@ function withProtocol(url: string): string {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
-/**
- * Busca a página inicial e extrai fatos. HTML externo é tratado
- * apenas como texto/DOM de leitura: nada é renderizado nem executado.
- */
-export async function crawlWebsite(
-  rawUrl: string,
-): Promise<WebsiteFacts> {
-  const url = withProtocol(rawUrl.trim());
-
+async function fetchHtml(
+  url: string,
+): Promise<{ html: string; finalUrl: string; status: number } | { error: string; status: number | null; finalUrl: string | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -41,29 +36,64 @@ export async function crawlWebsite(
     const finalUrl = response.url || url;
 
     if (!response.ok) {
-      return {
-        ...failedWebsiteFacts(
-          url,
-          `HTTP ${response.status}`,
-          response.status,
-        ),
-        finalUrl,
-      };
+      return { error: `HTTP ${response.status}`, status: response.status, finalUrl };
     }
 
-    const html = (await response.text()).slice(0, MAX_HTML_BYTES);
-
-    return extractWebsiteFacts(html, {
-      url,
+    return {
+      html: (await response.text()).slice(0, MAX_HTML_BYTES),
       finalUrl,
-      httpStatus: response.status,
-    });
+      status: response.status,
+    };
   } catch (err) {
-    return failedWebsiteFacts(
-      url,
-      err instanceof Error ? err.message : "Falha de rede",
-    );
+    return {
+      error: err instanceof Error ? err.message : "Falha de rede",
+      status: null,
+      finalUrl: null,
+    };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Busca a página inicial (e a página de contato, se houver) e extrai
+ * fatos. HTML externo é tratado só como texto/DOM de leitura: nada é
+ * renderizado nem executado.
+ */
+export async function crawlWebsite(
+  rawUrl: string,
+): Promise<WebsiteFacts> {
+  const url = withProtocol(rawUrl.trim());
+
+  const home = await fetchHtml(url);
+
+  if ("error" in home) {
+    return {
+      ...failedWebsiteFacts(url, home.error, home.status),
+      finalUrl: home.finalUrl,
+    };
+  }
+
+  const facts = extractWebsiteFacts(home.html, {
+    url,
+    finalUrl: home.finalUrl,
+    httpStatus: home.status,
+  });
+
+  if (facts.contactPageUrl && facts.contactPageUrl !== home.finalUrl) {
+    const contact = await fetchHtml(facts.contactPageUrl);
+
+    if (!("error" in contact)) {
+      return mergeWebsiteFacts(
+        facts,
+        extractWebsiteFacts(contact.html, {
+          url: facts.contactPageUrl,
+          finalUrl: contact.finalUrl,
+          httpStatus: contact.status,
+        }),
+      );
+    }
+  }
+
+  return facts;
 }

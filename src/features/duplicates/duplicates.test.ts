@@ -118,6 +118,14 @@ describe("merge", () => {
     expect(tasks).toHaveLength(2);
   });
 
+  it("merging remembers the removed Google place so it is never collected again", async () => {
+    const master = await insert("Clínica Alfa");
+    const dup = await insert("Clinica Alfa Ltda", { google_place_id: "gp-dup" });
+    await mergeCompanies(master, dup);
+    const [seen] = await db.select<{ company_id: number }[]>(`SELECT company_id FROM seen_places WHERE google_place_id = 'gp-dup'`);
+    expect(seen.company_id).toBe(master);
+  });
+
   it("scan finds the pair and refuses to merge a record with itself", async () => {
     const a = await insert("Academia Força");
     await insert("ACADEMIA FORCA LTDA");

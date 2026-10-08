@@ -19,6 +19,7 @@ import { deriveSignals } from "../signals/signals.engine";
 import { computeScore } from "../scoring/scoring.engine";
 import { enrichCompany } from "./enrichment.service";
 import { setSetting } from "../settings/settings.service";
+import { ensureServicesSeed } from "../services/services.service";
 
 const HTML_GOOD = `<html><head><title>Clínica</title>
 <meta name="viewport" content="width=device-width">
@@ -46,7 +47,8 @@ describe("dedupe + discovery", () => {
       { id: "p5", displayName: { text: "Nova" }, formattedAddress: "Rua 9" },
     ];
     const r = await importPlaces(places, "Odontologia");
-    expect(r).toEqual({ found: 6, imported: 2, duplicates: 4 });
+    expect(r).toMatchObject({ found: 6, imported: 2, duplicates: 3, alreadySeen: 1 });
+    expect(r.companyIds).toHaveLength(2);
     const src = await db.select<{ n: number }[]>("SELECT COUNT(*) n FROM company_sources");
     expect(src[0].n).toBe(2);
     const prospects = await db.select<{ n: number }[]>("SELECT COUNT(*) n FROM prospects");
@@ -124,5 +126,75 @@ describe("enrichment pipeline", () => {
     expect(out.status).toBe("DISQUALIFIED");
     const [c] = await db.select<{ disqualified_reason: string }[]>("SELECT * FROM companies");
     expect(c.disqualified_reason).toContain("BAIXADA");
+  });
+});
+
+describe("never collect the same data twice", () => {
+  beforeEach(async () => {
+    db = await createMigratedTestDb();
+  });
+
+  it("a place stays 'seen' even after its company is deleted", async () => {
+    const place = { id: "gp-1", displayName: { text: "Clínica Única" }, formattedAddress: "Rua A, 1" };
+    const first = await importPlaces([place], "Odontologia");
+    expect(first.imported).toBe(1);
+
+    await db.execute("DELETE FROM companies");
+    const again = await importPlaces([place], "Odontologia");
+    expect(again).toMatchObject({ imported: 0, alreadySeen: 1 });
+    const [{ n }] = await db.select<{ n: number }[]>("SELECT COUNT(*) n FROM companies");
+    expect(n).toBe(0);
+    const [{ times_seen }] = await db.select<{ times_seen: number }[]>("SELECT times_seen FROM seen_places WHERE google_place_id='gp-1'");
+    expect(times_seen).toBe(2);
+  });
+
+  it("places already present as companies (pre-ledger data) are not re-imported", async () => {
+    await importCompany({ name: "Antiga", googlePlaceId: "gp-old", city: "Cuiabá" }, "MANUAL");
+    const r = await importPlaces([{ id: "gp-old", displayName: { text: "Antiga" } }], "X");
+    expect(r).toMatchObject({ imported: 0, alreadySeen: 1 });
+  });
+});
+
+describe("enrichment creates channels and approaches, with opt-in steps", () => {
+  beforeEach(async () => {
+    db = await createMigratedTestDb();
+    await ensureServicesSeed();
+  });
+
+  const html = `<html><body><a href="https://wa.me/5565988887777">Zap</a><a href="https://instagram.com/clinicab">ig</a>
+  <p>contato@clinicab.com.br</p></body></html>`;
+  const crawler = async (u: string) => extractWebsiteFacts(html, { url: u, finalUrl: u, httpStatus: 200 });
+
+  it("full enrichment: channels, signals, score, services and template approaches", async () => {
+    const { id } = await importCompany({ name: "Clínica B", segment: "Odontologia", city: "Cuiabá", website: "http://clinicab.com.br", phone: "(65) 3333-2222" }, "MANUAL");
+    const out = await enrichCompany(id, crawler);
+    expect(out.channels).toBeGreaterThanOrEqual(5);
+
+    const kinds = (await db.select<{ kind: string }[]>("SELECT kind FROM company_channels WHERE company_id=$1", [id])).map((c) => c.kind);
+    expect(kinds).toEqual(expect.arrayContaining(["WHATSAPP", "PHONE", "EMAIL", "INSTAGRAM", "WEBSITE"]));
+
+    const ap = await db.select<{ channel: string; source: string }[]>("SELECT channel, source FROM company_approaches WHERE company_id=$1", [id]);
+    expect(ap.length).toBeGreaterThan(0);
+    expect(ap.every((a) => a.source === "TEMPLATE")).toBe(true);
+
+    // rodar de novo não duplica canais nem abordagens
+    const before = ap.length;
+    await enrichCompany(id, crawler);
+    expect(await db.select("SELECT id FROM company_channels WHERE company_id=$1", [id])).toHaveLength(out.channels);
+    expect(await db.select("SELECT id FROM company_approaches WHERE company_id=$1", [id])).toHaveLength(before);
+  });
+
+  it("opt-out: without analysis it only collects contacts (no score/signals)", async () => {
+    const { id } = await importCompany({ name: "Clínica C", city: "Cuiabá", website: "http://c.com.br" }, "MANUAL");
+    const out = await enrichCompany(id, crawler, { crawlSite: true, analyze: false });
+    expect(out.total).toBeNull();
+    expect(await db.select("SELECT id FROM signals WHERE company_id=$1", [id])).toHaveLength(0);
+    expect(await db.select("SELECT id FROM company_scores WHERE company_id=$1", [id])).toHaveLength(0);
+    expect((await db.select("SELECT id FROM company_channels WHERE company_id=$1", [id])).length).toBeGreaterThan(0);
+
+    // sem permissão para ler o site: o crawler nem é chamado
+    let called = false;
+    await enrichCompany(id, async (u) => { called = true; return crawler(u); }, { crawlSite: false, analyze: false });
+    expect(called).toBe(false);
   });
 });
