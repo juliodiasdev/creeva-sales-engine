@@ -1045,3 +1045,20 @@ button.search-item small { color: var(--muted); font-weight: 400; }
 .secret-field { display: flex; flex-direction: column; gap: 8px; }
 .secret-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 button.small-btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
+
+/* ---------- listas ---------- */
+.stepper { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0; }
+.step { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); color: inherit; cursor: pointer; text-align: left; }
+.step strong { font-size: 22px; }
+.step span { font-size: 12px; color: var(--muted); }
+.step.active { border-color: var(--accent, #7c5cff); }
+.step:disabled { opacity: 0.5; cursor: default; }
+.list-table { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: auto; }
+.list-row { display: grid; grid-template-columns: 32px minmax(200px, 2fr) minmax(160px, 1.3fr) 110px 110px minmax(180px, 1.2fr); gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.list-row:last-child { border-bottom: none; }
+.list-row > div { display: flex; flex-direction: column; min-width: 0; }
+.list-row small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-head { background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; position: sticky; top: 0; }
+.row-actions { flex-direction: row !important; gap: 6px; flex-wrap: wrap; }
+.search-input { min-width: 260px; }
+@media (max-width: 900px) { .list-row { grid-template-columns: 28px 1fr 100px; } .list-row > :nth-child(3), .list-row > :nth-child(4), .list-row > :nth-child(6) { display: none; } }

@@ -1,6 +1,7 @@
 export type LeadStatus =
   | "DISCOVERED"
   | "ENRICHING"
+  | "ENRICHED"
   | "QUALIFIED"
   | "READY"
   | "DISQUALIFIED";
@@ -39,6 +40,10 @@ export interface Company {
   lead_status: LeadStatus;
   disqualified_reason: string | null;
 
+  list_id: number | null;
+  maps_url: string | null;
+  business_status: string | null;
+
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +67,11 @@ export interface CreateCompanyInput {
   category?: string;
   rating?: number;
   reviewsCount?: number;
+
+  /** Lista de prospecção que originou a empresa. */
+  listId?: number;
+  mapsUrl?: string;
+  businessStatus?: string;
 }
 
 export type SourceType =

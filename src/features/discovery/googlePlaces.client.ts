@@ -15,6 +15,8 @@ const FIELD_MASK = [
   "places.rating",
   "places.userRatingCount",
   "places.primaryTypeDisplayName",
+  "places.googleMapsUri",
+  "places.businessStatus",
 ].join(",");
 
 interface PlaceComponent {
@@ -33,6 +35,8 @@ export interface GooglePlace {
   rating?: number;
   userRatingCount?: number;
   primaryTypeDisplayName?: { text?: string };
+  googleMapsUri?: string;
+  businessStatus?: string;
   /** Resultado da API legada: telefone/site ainda não buscados. */
   legacy?: boolean;
 }
@@ -72,6 +76,10 @@ export function placeToCompanyInput(
     category: place.primaryTypeDisplayName?.text,
     rating: place.rating,
     reviewsCount: place.userRatingCount,
+    mapsUrl:
+      place.googleMapsUri ||
+      `https://www.google.com/maps/place/?q=place_id:${place.id}`,
+    businessStatus: place.businessStatus,
   };
 }
 
@@ -118,6 +126,7 @@ interface LegacyResult {
   rating?: number;
   user_ratings_total?: number;
   types?: string[];
+  business_status?: string;
 }
 
 interface LegacyResponse {
@@ -125,7 +134,7 @@ interface LegacyResponse {
   error_message?: string;
   results?: LegacyResult[];
   next_page_token?: string;
-  result?: { website?: string; formatted_phone_number?: string };
+  result?: { website?: string; formatted_phone_number?: string; url?: string };
 }
 
 /** "Rua X, 10 - Bairro, Cuiabá - MT, 78000-000, Brasil" -> cidade e UF. */
@@ -154,6 +163,8 @@ export function legacyToPlace(
       : undefined,
     websiteUri: details?.website,
     nationalPhoneNumber: details?.formatted_phone_number,
+    googleMapsUri: details?.url,
+    businessStatus: r.business_status,
     legacy: !details,
   };
 }
@@ -242,7 +253,7 @@ export async function completePlace(
     const details = (
       await legacyGet("details", {
         place_id: place.id,
-        fields: "website,formatted_phone_number",
+        fields: "website,formatted_phone_number,url",
         language: "pt-BR",
         key: apiKey,
       })
@@ -252,6 +263,7 @@ export async function completePlace(
       ...place,
       websiteUri: details?.website,
       nationalPhoneNumber: details?.formatted_phone_number,
+      googleMapsUri: details?.url ?? place.googleMapsUri,
       legacy: false,
     };
   } catch {

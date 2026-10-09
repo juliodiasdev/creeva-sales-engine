@@ -57,9 +57,9 @@ export const DEFAULT_ENRICH_OPTIONS: EnrichOptions = {
 type Crawler = (url: string) => Promise<WebsiteFacts>;
 
 /**
- * DISCOVERED -> ENRICHING -> (score >= mínimo) QUALIFIED.
- * Empresa com CNPJ não ativo é DISQUALIFIED com motivo registrado.
- * Score abaixo do mínimo permanece ENRICHING (decisão humana).
+ * Nova -> Enriquecendo -> Enriquecida. Quem qualifica ou descarta é o
+ * usuário (a pontuação apenas recomenda). CNPJ não ativo é descartado
+ * automaticamente, com o motivo registrado.
  *
  * Tudo aqui é determinístico (sem IA).
  */
@@ -72,7 +72,13 @@ export async function enrichCompany(
 
   if (!company) throw new Error("Empresa não encontrada.");
 
-  if (company.lead_status !== "READY") {
+  // Só empresas ainda em triagem mudam de etapa; qualificadas, descartadas
+  // e em abordagem mantêm a situação (o enriquecimento só acrescenta dados).
+  const inTriage = ["DISCOVERED", "ENRICHING", "ENRICHED"].includes(
+    company.lead_status,
+  );
+
+  if (inTriage) {
     await setLeadStatusRepository(companyId, "ENRICHING");
   }
 
@@ -94,9 +100,11 @@ export async function enrichCompany(
   await saveChannelsRepository(companyId, channels);
 
   if (!options.analyze) {
+    if (inTriage) await setLeadStatusRepository(companyId, "ENRICHED");
+
     return {
       total: null,
-      status: company.lead_status === "READY" ? "READY" : "ENRICHING",
+      status: inTriage ? "ENRICHED" : company.lead_status,
       channels: channels.length,
     };
   }
@@ -148,16 +156,21 @@ export async function enrichCompany(
     }),
   );
 
-  if (company.lead_status === "READY") {
-    return { total: score.total, status: "READY", channels: channels.length };
+  if (!inTriage) {
+    return {
+      total: score.total,
+      status: company.lead_status,
+      channels: channels.length,
+    };
   }
 
-  const status = company.registration_status &&
+  // Processo controlado: o enriquecimento NÃO qualifica sozinho. A empresa
+  // fica "Enriquecida" e o usuário decide (a pontuação só recomenda).
+  const status =
+    company.registration_status &&
     !company.registration_status.toUpperCase().includes("ATIVA")
-    ? "DISQUALIFIED"
-    : score.total >= Number((await getSetting("min_score")) ?? 50)
-      ? "QUALIFIED"
-      : "ENRICHING";
+      ? "DISQUALIFIED"
+      : "ENRICHED";
 
   await setLeadStatusRepository(
     companyId,

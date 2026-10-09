@@ -12,7 +12,7 @@ import { deleteAllRows, resetSequences } from "./reset.service";
 export const BACKUP_FORMAT = "creava-sales-engine-backup";
 
 /** Versão do formato. Backups de versões anteriores continuam válidos. */
-export const BACKUP_SCHEMA_VERSION = 5;
+export const BACKUP_SCHEMA_VERSION = 6;
 
 export interface BackupFile {
   format: typeof BACKUP_FORMAT;

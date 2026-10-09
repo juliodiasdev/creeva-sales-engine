@@ -1,4 +1,4 @@
-import { fetchAllPages, getSupabase } from "../../lib/store";
+import { fetchAllPages, getSupabase, unwrap } from "../../lib/store";
 
 import {
   LEAD_STATUS_LABEL,
@@ -58,6 +58,8 @@ export interface ExportApproach {
 export interface ExportData {
   companies: ExportCompany[];
   approaches: ExportApproach[];
+  /** Nome da lista exportada (vazio = base geral). */
+  listName?: string;
 }
 
 const CHANNEL_NAME: Record<string, string> = {
@@ -248,7 +250,7 @@ export function toCsv(companies: ExportCompany[]): string {
 }
 
 /** Carrega tudo do banco e organiza para exportação. */
-export async function loadExportData(): Promise<ExportData> {
+export async function loadExportData(listId?: number): Promise<ExportData> {
   const supabase = getSupabase();
 
   const page = <T,>(table: string, columns: string, order = "id") =>
@@ -284,13 +286,29 @@ export async function loadExportData(): Promise<ExportData> {
     }
   }
 
-  return buildExportData({
-    companies: companies.map((c) => ({ ...c, id: Number(c.id) })),
-    channels,
-    approaches,
+  const scope = listId === undefined
+    ? companies
+    : companies.filter((c) => Number(c.list_id) === listId);
+
+  const inScope = new Set(scope.map((c) => Number(c.id)));
+
+  const data = buildExportData({
+    companies: scope.map((c) => ({ ...c, id: Number(c.id) })),
+    channels: channels.filter((c) => inScope.has(Number(c.company_id))),
+    approaches: approaches.filter((a) => inScope.has(Number(a.company_id))),
     scores: latestScore,
     prospectStatus: new Map(prospects.map((p) => [Number(p.company_id), p.status])),
     sources: firstSource,
     serviceNames: new Map(services.map((s) => [s.key, s.name])),
   });
+
+  if (listId !== undefined) {
+    const list = unwrap(
+      await supabase.from("lists").select("name").eq("id", listId).maybeSingle(),
+    ) as { name: string } | null;
+
+    data.listName = list?.name;
+  }
+
+  return data;
 }

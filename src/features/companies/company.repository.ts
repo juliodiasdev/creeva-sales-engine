@@ -39,6 +39,9 @@ export async function createCompanyRepository(
         category: input.category ?? null,
         rating: input.rating ?? null,
         reviews_count: input.reviewsCount ?? null,
+        list_id: input.listId ?? null,
+        maps_url: input.mapsUrl ?? null,
+        business_status: input.businessStatus ?? null,
         domain: siteDomain(input.website),
         phone_normalized: normalizePhone(input.phone),
         dedupe_key: buildDedupeKey(

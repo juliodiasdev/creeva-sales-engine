@@ -50,10 +50,12 @@ function scoreColors(score: number | null): { bg: string; fg: string } {
 
 function statusColors(status: string): { bg: string; fg: string } {
   switch (status) {
-    case "Em prospecção":
+    case "Em abordagem":
       return { bg: LIME, fg: INK };
     case "Qualificada":
       return { bg: "FFC6F0D2", fg: "FF145A32" };
+    case "Enriquecida":
+      return { bg: "FFDCE9FF", fg: "FF1D3F8A" };
     case "Descartada":
       return { bg: "FFFAD4D4", fg: "FF8A1C1C" };
     default:
@@ -102,7 +104,7 @@ function addSummary(wb: ExcelJS.Workbook, data: ExportData, when: Date) {
   ws.getRow(1).height = 40;
 
   ws.mergeCells("A2:D2");
-  ws.getCell("A2").value = `Base de contatos · gerada em ${when.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`;
+  ws.getCell("A2").value = `${data.listName ? `Lista: ${data.listName}` : "Base geral de contatos"} · gerada em ${when.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`;
   ws.getCell("A2").font = { size: 11, color: { argb: "FFCCCCCC" } };
   ws.getCell("A2").fill = fill(INK);
   ws.getCell("A2").alignment = { vertical: "middle", indent: 1 };
