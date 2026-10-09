@@ -6,6 +6,7 @@ import logo from "../assets/creava-logo.png";
 export type PageId =
   | "today"
   | "dashboard"
+  | "prospect"
   | "lists"
   | "companies"
   | "contacts"
@@ -27,6 +28,12 @@ const ICONS: Record<PageId, ReactNode> = {
       <rect x="14" y="3" width="7" height="5" />
       <rect x="14" y="12" width="7" height="9" />
       <rect x="3" y="16" width="7" height="5" />
+    </>
+  ),
+  prospect: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
     </>
   ),
   lists: (
@@ -84,8 +91,9 @@ export interface NavItem {
 /** Ordem = atalhos Ctrl+1…Ctrl+0. Agrupado como nos grandes CRMs. */
 export const NAV_ITEMS: NavItem[] = [
   { id: "today", label: "Hoje", section: "INÍCIO", description: "Seu processo e as tarefas do dia: o que fazer agora para gerar clientes." },
-  { id: "lists", label: "Listas", section: "PROCESSO", description: "Prospecte no Google Maps, enriqueça, qualifique e inicie a abordagem lista por lista." },
-  { id: "session", label: "Prospectar agora", section: "PROCESSO", description: "Uma empresa por vez: copie, envie e passe para a próxima." },
+  { id: "prospect", label: "Prospectar", section: "PROCESSO", description: "Busque empresas no Google Maps por nicho, estado e cidade: cada busca gera uma lista." },
+  { id: "lists", label: "Listas", section: "PROCESSO", description: "Cada prospecção vira uma lista: enriqueça, qualifique e inicie a abordagem." },
+  { id: "session", label: "Abordar agora", section: "PROCESSO", description: "Uma empresa por vez: copie, envie e passe para a próxima." },
   { id: "pipeline", label: "Funil de vendas", section: "PROCESSO", description: "Acompanhe cada empresa do primeiro contato até o fechamento." },
   { id: "companies", label: "Base geral", section: "BASE", description: "Todas as empresas cadastradas, com organização de duplicados." },
   { id: "contacts", label: "Contatos", section: "BASE", description: "WhatsApp, redes sociais e e-mail de cada empresa, com exportação para planilha." },

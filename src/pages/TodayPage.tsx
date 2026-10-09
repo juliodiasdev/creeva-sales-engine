@@ -255,8 +255,8 @@ export function TodayPage({ onOpenProspect, onOpenList, onNavigate }: Props) {
         </div>
       ) : (
         <div className="empty">
-          Comece criando uma lista: busque empresas no Google Maps, enriqueça e qualifique.
-          <div><button type="button" onClick={() => onNavigate("lists")}>Criar primeira lista</button></div>
+          Comece prospectando: busque empresas no Google Maps, e cada busca vira uma lista para enriquecer e qualificar.
+          <div><button type="button" onClick={() => onNavigate("prospect")}>Prospectar no Google Maps</button></div>
         </div>
       )}
     </section>

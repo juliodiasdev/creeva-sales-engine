@@ -22,6 +22,7 @@ import { CompaniesPage } from "./pages/CompaniesPage";
 import { ContactsPage } from "./pages/ContactsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ListsPage } from "./pages/ListsPage";
+import { ProspectPage } from "./pages/ProspectPage";
 import { ListDetailPage } from "./pages/ListDetailPage";
 import { PlaybookPage } from "./pages/PlaybookPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -52,8 +53,10 @@ function renderPage(
       return <TodayPage onOpenProspect={openProspect} onOpenList={openList} onNavigate={navigate} />;
     case "dashboard":
       return <DashboardPage />;
+    case "prospect":
+      return <ProspectPage onOpenList={openList} />;
     case "lists":
-      return <ListsPage onOpenList={openList} />;
+      return <ListsPage onOpenList={openList} onNewSearch={() => navigate("prospect")} />;
     case "companies":
       return <CompaniesPage onOpenCompany={openCompany} />;
     case "contacts":
@@ -292,13 +295,13 @@ function App() {
             }}
           />
 
-          {(page !== "lists" || listId !== null) && (
+          {(page !== "prospect" || listId !== null) && (
             <button
               type="button"
               className="topbar-cta"
-              onClick={() => navigate("lists")}
+              onClick={() => navigate("prospect")}
             >
-              + Nova lista
+              + Nova prospecção
             </button>
           )}
         </header>

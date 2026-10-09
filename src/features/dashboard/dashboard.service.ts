@@ -2,7 +2,9 @@ import { fetchAllPages, getSupabase } from "../../lib/store";
 
 export interface DashboardMetrics {
   companiesDiscovered: number;
+  companiesEnriched: number;
   companiesQualified: number;
+  companiesDiscarded: number;
   prospects: number;
   contactsSent: number;
   replies: number;
@@ -77,7 +79,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 
   const [
     companiesDiscovered,
+    companiesEnriched,
     companiesQualified,
+    companiesDiscarded,
     prospects,
     contactsSent,
     replies,
@@ -86,7 +90,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     lost,
   ] = await Promise.all([
     count("companies"),
+    countWhere("companies", "lead_status", ["ENRICHED", "QUALIFIED", "READY"]),
     countWhere("companies", "lead_status", ["QUALIFIED", "READY"]),
+    countWhere("companies", "lead_status", ["DISQUALIFIED"]),
     count("prospects"),
     distinctProspects("MESSAGE_SENT"),
     distinctProspects("REPLY_RECEIVED"),
@@ -100,7 +106,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 
   return {
     companiesDiscovered,
+    companiesEnriched,
     companiesQualified,
+    companiesDiscarded,
     prospects,
     contactsSent,
     replies,
