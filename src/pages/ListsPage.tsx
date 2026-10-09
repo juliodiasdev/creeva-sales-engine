@@ -11,6 +11,7 @@ import type { ListWithStats } from "../features/lists/lists.service";
 import { archiveList } from "../features/lists/lists.service";
 import { getSetting } from "../features/settings/settings.service";
 
+import type { DiscoveryResult } from "../features/discovery/discovery.service";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage, formatDateTime } from "../lib/format";
 
@@ -59,6 +60,17 @@ export function ListsPage({ onOpenList }: Props) {
 
     return () => clearInterval(timer);
   }, [searching, refresh]);
+
+  const lastDone = jobs.find(
+    (j) => j.type === "DISCOVERY" && j.status === "COMPLETED" && j.result,
+  );
+  let lastResult: DiscoveryResult | null = null;
+
+  try {
+    lastResult = lastDone ? (JSON.parse(lastDone.result as string) as DiscoveryResult) : null;
+  } catch {
+    lastResult = null;
+  }
 
   const failed = jobs.find((j) => j.type === "DISCOVERY" && j.status === "FAILED");
 
@@ -163,6 +175,19 @@ export function ListsPage({ onOpenList }: Props) {
 
         {failed && !searching && failed.error && (
           <p className="error">Última busca falhou: {failed.error}</p>
+        )}
+
+        {lastResult && !searching && (
+          <p className="muted">
+            <strong>Última busca:</strong> o Google retornou {lastResult.found} lugar(es):{" "}
+            {lastResult.imported} novo(s), {lastResult.alreadySeen} já coletado(s) antes,{" "}
+            {lastResult.duplicates} duplicado(s).
+            {lastResult.found === 0 &&
+              " O Google não encontrou nada: tente outro termo de segmento ou outra região."}
+            {lastResult.found > 0 &&
+              lastResult.imported === 0 &&
+              " Nenhuma lista foi criada porque todos esses lugares já estão na sua base (veja as listas “(anteriores)” ou a Base geral). Use outro bairro ou segmento para achar empresas novas."}
+          </p>
         )}
 
         {message && <p className="muted">{message}</p>}
