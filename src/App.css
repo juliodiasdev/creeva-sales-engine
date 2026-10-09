@@ -704,10 +704,20 @@ strong.clickable:hover { color: var(--accent); }
 
 .funnel-row {
   display: grid;
-  grid-template-columns: 170px 1fr 48px;
+  grid-template-columns: 200px 1fr 48px 64px;
   align-items: center;
   gap: 12px;
 }
+
+.funnel-row span small { display: block; color: var(--muted); font-size: 11px; }
+.funnel-row em { font-style: normal; color: var(--muted); font-size: 12px; text-align: right; }
+.funnel-bar { height: 14px; }
+.kpi-group { margin-bottom: 8px; }
+.kpi-group .group-title { margin: 0 0 8px; }
+.perf-table { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: auto; }
+.perf-row { display: grid; grid-template-columns: minmax(200px, 2.2fr) repeat(5, minmax(80px, 1fr)); gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.perf-row:last-child { border-bottom: none; }
+.perf-head { background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 
 .funnel-bar {
   height: 10px;
@@ -768,7 +778,9 @@ strong.clickable:hover { color: var(--accent); }
   .task-item { flex-direction: column; align-items: stretch; }
   .task-actions { justify-content: flex-start; }
 
-  .funnel-row { grid-template-columns: 120px 1fr 40px; }
+  .funnel-row { grid-template-columns: 120px 1fr 40px 52px; }
+  .perf-row { grid-template-columns: 1.6fr repeat(3, 1fr); }
+  .perf-row > :nth-child(n+5) { display: none; }
 }
 
 @media (max-width: 640px) {
