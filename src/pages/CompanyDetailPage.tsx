@@ -21,10 +21,12 @@ import {
   getLatestAnalysis,
 } from "../features/ai/ai.service";
 import type { StoredAnalysis } from "../features/ai/ai.service";
+import { parseBottlenecks } from "../features/ai/ai.service";
 
 import { label, LEAD_STATUS_LABEL, SCORE_DIMENSION_LABEL, SIGNAL_LABEL, SOURCE_LABEL, humanizeReason } from "../lib/labels";
 import { createProspect } from "../features/prospects/prospect.service";
 
+import { consolidateChannels } from "../features/contacts/consolidate";
 import { ChannelButtons } from "../features/contacts/ChannelButtons";
 import { listChannelsRepository } from "../features/contacts/channels.repository";
 import type { StoredChannel } from "../features/contacts/channels.repository";
@@ -240,7 +242,7 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Contatos ({channels.length})</h2>
+          <h2>Contatos</h2>
         </div>
 
         <ChannelButtons
@@ -252,18 +254,33 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
           subject={`Contato — ${company.name}`}
         />
 
-        {channels.length > 0 && (
-          <ul className="reasons">
-            {channels.map((ch) => (
-              <li key={ch.id}>
-                <strong>{CHANNEL_LABEL[ch.kind]}</strong> — {ch.kind === "PHONE" || ch.kind === "WHATSAPP" ? formatPhone(ch.value) : ch.value}{" "}
-                <small>
-                  ({ch.label ? `${ch.label}; ` : ""}fonte: {label(SOURCE_LABEL, ch.source)})
-                </small>
-              </li>
-            ))}
-          </ul>
-        )}
+        {channels.length > 0 && (() => {
+          const { main, extra } = consolidateChannels(channels);
+          const line = (ch: StoredChannel) => (
+            <li key={ch.id}>
+              <strong>{CHANNEL_LABEL[ch.kind]}</strong> —{" "}
+              {ch.kind === "PHONE" || ch.kind === "WHATSAPP" ? formatPhone(ch.value) : ch.value}{" "}
+              <small>
+                ({ch.label ? `${ch.label}; ` : ""}fonte: {label(SOURCE_LABEL, ch.source)})
+              </small>
+            </li>
+          );
+
+          return (
+            <>
+              <ul className="reasons">{main.map(line)}</ul>
+
+              {extra.length > 0 && (
+                <details>
+                  <summary className="muted">
+                    Outros contatos encontrados ({extra.length})
+                  </summary>
+                  <ul className="reasons">{extra.map(line)}</ul>
+                </details>
+              )}
+            </>
+          );
+        })()}
 
         {channels.length === 0 && (
           <p className="muted">
@@ -424,6 +441,37 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
           </ul>
         )}
       </section>
+
+      {analysis && parseBottlenecks(analysis).length > 0 && (
+        <section className="panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">DIAGNÓSTICO</span>
+              <h2>Gargalos que a Creava resolve</h2>
+            </div>
+          </div>
+
+          <div className="tasks-list">
+            {parseBottlenecks(analysis).map((b) => (
+              <article className="task-item" key={`${b.title}-${b.service_key}`}>
+                <div className="task-body">
+                  <strong>{b.title}</strong>
+                  <p>{b.impact}</p>
+                  <p className="muted">
+                    Evidência: {b.evidence.map((e) => SIGNAL_LABEL[e] ?? e).join(", ")} · confiança{" "}
+                    {Math.round(b.confidence * 100)}%
+                  </p>
+                </div>
+                <div className="task-actions">
+                  <span className="status">
+                    {services.find((sv) => sv.key === b.service_key)?.name ?? b.service_key}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {analysis && (
         <section className="panel">

@@ -95,11 +95,12 @@ export function EnrichDialog({
           onChange={() => toggle("ai")}
         />
         <span>
-          <strong>Plano com IA (opcional)</strong>
+          <strong>Diagnóstico de gargalos com IA (opcional)</strong>
           <small>
-            Usa a OpenAI: 1 chamada por empresa (centavos) para
-            refinar o diagnóstico, os serviços e as mensagens. Máx.{" "}
-            {MAX_AI} por vez.
+            A OpenAI analisa os dados reais de cada empresa e aponta os
+            gargalos que a Creava resolve, sempre com a evidência que
+            os comprova (1 chamada por empresa, centavos). Máx. {MAX_AI}{" "}
+            por vez.
           </small>
         </span>
       </label>

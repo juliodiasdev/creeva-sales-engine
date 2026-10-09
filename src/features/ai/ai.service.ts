@@ -28,6 +28,7 @@ import type { ServiceKey } from "../services/services.service";
 
 import type {
   AiAnalysisResult,
+  AiBottleneck,
   AiOutreachResult,
 } from "./ai.validation";
 
@@ -37,6 +38,8 @@ export interface StoredAnalysis extends AiAnalysisResult {
   model: string | null;
   /** JSON: [{ service_key, reason, pitch }] */
   recommended_services: string | null;
+  /** JSON: [{ title, evidence[], service_key, impact, confidence }] */
+  bottlenecks: string | null;
   created_at: string;
 }
 
@@ -138,6 +141,7 @@ export async function planCompanyWithAi(
       content: `Analise a empresa e ajude a decidir COMO vender os serviços da ${agency}${seller ? ` (vendedor: ${seller})` : ""}.
 Responda JSON com:
 - summary, main_problem, opportunity, recommended_offer, outreach_angle (strings) e confidence (0 a 1);
+- bottlenecks: lista de gargalos do negócio que a Creava resolve, cada um {"title", "evidence", "service_key", "impact", "confidence"}. "evidence" é a lista de TIPOS de sinais (da lista de sinais dos dados) que provam o gargalo: gargalo sem sinal existente NÃO deve ser listado. "impact" é o efeito provável no negócio, em 1 frase, sem números inventados;
 - recommended_services: lista de {"service_key", "reason", "pitch"} usando SOMENTE chaves do catálogo e razões baseadas nos dados;
 - approaches: até 3 abordagens {"channel", "service_key", "angle", "message", "evidence_used"}. channel deve estar em ${JSON.stringify(channelKinds)}; message curta (máx. 600 caracteres), tom humano, sem links; evidence_used lista APENAS tipos de sinal que existem nos dados (lista vazia se nenhum).
 Só afirme problemas que correspondam a um sinal listado.
@@ -164,6 +168,7 @@ Dados: ${JSON.stringify(context)}`,
       confidence: plan.analysis.confidence,
       model,
       recommended_services: JSON.stringify(plan.services),
+      bottlenecks: JSON.stringify(plan.bottlenecks),
     }),
   );
 
@@ -182,6 +187,21 @@ Dados: ${JSON.stringify(context)}`,
   );
 
   return (await getLatestAnalysis(companyId))!;
+}
+
+/** Gargalos validados (com evidência real) da última análise. */
+export function parseBottlenecks(
+  analysis: Pick<StoredAnalysis, "bottlenecks"> | null,
+): AiBottleneck[] {
+  if (!analysis?.bottlenecks) return [];
+
+  try {
+    const parsed = JSON.parse(analysis.bottlenecks);
+
+    return Array.isArray(parsed) ? (parsed as AiBottleneck[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Compatibilidade: a "análise" agora já inclui serviços e abordagens. */

@@ -331,6 +331,45 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX idx_companies_list ON companies(list_id)`,
     ],
   },
+  {
+    version: 6,
+    name: "conversations_suppressions_bottlenecks",
+    statements: [
+      `ALTER TABLE ai_analyses ADD COLUMN bottlenecks TEXT`,
+      `CREATE TABLE conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
+        opted_out INTEGER NOT NULL DEFAULT 0,
+        handoff_reason TEXT,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`,
+      `CREATE TABLE conversation_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        direction TEXT NOT NULL,
+        author TEXT NOT NULL,
+        body TEXT NOT NULL,
+        status TEXT NOT NULL,
+        intent TEXT,
+        model TEXT,
+        edited INTEGER NOT NULL DEFAULT 0,
+        evidence_used TEXT,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`,
+      `CREATE INDEX idx_conv_messages_conv ON conversation_messages(conversation_id)`,
+      `CREATE INDEX idx_conv_messages_company ON conversation_messages(company_id)`,
+      `CREATE TABLE suppressions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL,
+        value TEXT NOT NULL,
+        reason TEXT,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (kind, value)
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(

@@ -1,3 +1,5 @@
+import { isCompanySuppressed } from "../compliance/suppression.service";
+import { logOutgoingMessage } from "../agent/conversation.service";
 import {
   completeTaskRepository,
   createTaskRepository,
@@ -72,6 +74,12 @@ async function loadDraftContext(taskId: number) {
   if (!prospect) {
     throw new Error(
       "Prospect não encontrado.",
+    );
+  }
+
+  if (await isCompanySuppressed(prospect.company_id)) {
+    throw new Error(
+      "Esta empresa pediu para não ser contatada: nenhuma abordagem pode ser preparada.",
     );
   }
 
@@ -201,6 +209,11 @@ export async function markTaskAsSent(
     "MESSAGE_SENT",
     content,
     "MANUAL",
+  );
+
+  // Histórico por empresa: nunca bloqueia o registro do envio.
+  await logOutgoingMessage(prospect.company_id, content).catch((err) =>
+    console.error("histórico de conversa", err),
   );
 
   if (task.type === "FIRST_CONTACT") {

@@ -1,3 +1,4 @@
+import { isCompanySuppressed, suppressCompany } from "../compliance/suppression.service";
 import {
   getProspectContextRepository,
   updateProspectWorkflowRepository,
@@ -97,6 +98,23 @@ export async function changeProspectStatus(
   const prospect = await requireProspect(prospectId);
 
   if (prospect.status === to) return;
+
+  // "Não contatar" é permanente: só sai por "Foi engano: desfazer" em Conversas.
+  if (
+    prospect.status === "DO_NOT_CONTACT" &&
+    (await isCompanySuppressed(Number(prospect.company_id)))
+  ) {
+    throw new Error(
+      'Esta empresa está na lista de supressão. Use "Foi engano: desfazer" em Conversas para reabrir.',
+    );
+  }
+
+  if (to === "DO_NOT_CONTACT") {
+    await suppressCompany(
+      Number(prospect.company_id),
+      "Marcada manualmente como não contatar",
+    );
+  }
 
   const closes = CLOSED.includes(to);
 

@@ -9,7 +9,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
   website_snapshots: ["id","company_id","url","facts","fetched_at"],
   signals: ["id","company_id","type","value","evidence","source","confidence","created_at"],
   company_scores: ["id","company_id","fit","need","capacity","intent","total","confidence","reasons","created_at"],
-  ai_analyses: ["id","company_id","summary","main_problem","opportunity","recommended_offer","outreach_angle","confidence","model","recommended_services","created_at"],
+  ai_analyses: ["id","company_id","summary","main_problem","opportunity","recommended_offer","outreach_angle","confidence","model","recommended_services","bottlenecks","created_at"],
   prospects: ["id","company_id","status","priority","score","next_action","next_action_at","qualification_notes","lost_reason","closed_at","created_at","updated_at"],
   tasks: ["id","prospect_id","type","title","description","priority","due_at","completed_at","outcome","created_at"],
   activities: ["id","prospect_id","type","channel","content","metadata","occurred_at"],
@@ -20,6 +20,9 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
   services: ["id","key","name","description","pain_points","active","sort","created_at"],
   company_channels: ["id","company_id","kind","value","url","label","source","created_at"],
   company_approaches: ["id","company_id","channel","service_key","angle","message","evidence_used","source","created_at"],
+  conversations: ["id","company_id","opted_out","handoff_reason","created_at","updated_at"],
+  conversation_messages: ["id","conversation_id","company_id","direction","author","body","status","intent","model","edited","evidence_used","created_at"],
+  suppressions: ["id","kind","value","reason","created_at"],
   seen_places: ["google_place_id","company_id","times_seen","first_seen_at","last_seen_at"],
   discovery_searches: ["id","query_key","segment","city","neighborhood","pages","runs","last_found","last_imported","last_run_at"],
   settings: ["key","value","updated_at"],
@@ -39,6 +42,9 @@ export const TABLE_ORDER = [
   "signals",
   "company_scores",
   "ai_analyses",
+  "conversations",
+  "conversation_messages",
+  "suppressions",
   "prospects",
   "tasks",
   "activities",
@@ -61,4 +67,4 @@ export const PRIMARY_KEY: Record<string, string> = {
 
 export const pkOf = (table: string): string => PRIMARY_KEY[table] ?? "id";
 
-export const SECRET_SETTING_KEYS = ["google_api_key", "openai_api_key"];
+export const SECRET_SETTING_KEYS = ["google_api_key", "openai_api_key", "anthropic_api_key"];

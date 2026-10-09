@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
 
-import { getDashboardMetrics } from "../features/dashboard/dashboard.service";
-import type { DashboardMetrics } from "../features/dashboard/dashboard.service";
+import { getAnalysisSummary, getDashboardMetrics } from "../features/dashboard/dashboard.service";
+import type { AnalysisSummary, DashboardMetrics } from "../features/dashboard/dashboard.service";
+import { getLearningSummary } from "../features/agent/learning.service";
+import type { LearningSummary } from "../features/agent/learning.service";
 import { loadListsWithStats } from "../features/lists/lists.service";
 import type { ListWithStats } from "../features/lists/lists.service";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage, formatCurrency } from "../lib/format";
+import { SIGNAL_LABEL } from "../lib/labels";
+import { DEFAULT_SERVICES } from "../features/services/services.service";
 
 const pct = (v: number) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 
 export function DashboardPage() {
   const [m, setM] = useState<DashboardMetrics | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisSummary | null>(null);
+  const [learning, setLearning] = useState<LearningSummary | null>(null);
   const [lists, setLists] = useState<ListWithStats[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([getDashboardMetrics(), loadListsWithStats()])
-      .then(([metrics, l]) => {
+    Promise.all([getDashboardMetrics(), loadListsWithStats(), getAnalysisSummary(), getLearningSummary()])
+      .then(([metrics, l, a, lr]) => {
+        setLearning(lr);
+        setAnalysis(a);
         setM(metrics);
         setLists(l);
       })
@@ -63,6 +71,57 @@ export function DashboardPage() {
         </div>
       </section>
 
+      {analysis && analysis.total > 0 && (
+        <section className="panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">ANÁLISE DAS EMPRESAS</span>
+              <h2>Funil de oportunidades</h2>
+            </div>
+          </div>
+
+          <div className="funnel">
+            {[
+              ["Captadas do Google Maps", analysis.total],
+              ["Analisadas (enriquecidas)", analysis.analyzed],
+              [`Alta oportunidade (pontuação ≥ ${analysis.minScore})`, analysis.highOpportunity],
+              ["Abaixo da pontuação mínima", analysis.belowMinimum],
+            ].map(([label, n], i, all) => (
+              <div className="funnel-row" key={String(label)}>
+                <span>{label}</span>
+                <div className="funnel-bar">
+                  <div style={{ width: `${(Number(n) / Math.max(1, analysis.total)) * 100}%` }} />
+                </div>
+                <strong>{n}</strong>
+                <em>
+                  {i === 0 ? "—" : pct(Number(n) / Math.max(1, Number(all[i === 3 ? 1 : i - 1][1])))}
+                </em>
+              </div>
+            ))}
+          </div>
+
+          {analysis.analyzed < analysis.total && (
+            <p className="muted small">
+              {analysis.total - analysis.analyzed} empresa(s) ainda não foram analisadas: abra a lista e use "Enriquecer".
+            </p>
+          )}
+
+          {analysis.signals.length > 0 && (
+            <>
+              <h3 className="group-title">O que a análise encontrou (empresas por oportunidade)</h3>
+              <div className="perf-table">
+                {analysis.signals.map((sg) => (
+                  <div className="perf-row sig-row" key={sg.type}>
+                    <span>{SIGNAL_LABEL[sg.type] ?? sg.type}</span>
+                    <strong>{sg.companies}</strong>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       <section className="panel">
         <div className="panel-title">
           <div>
@@ -99,6 +158,52 @@ export function DashboardPage() {
 
         <p className="muted small">A porcentagem à direita é a conversão em relação à etapa anterior.</p>
       </section>
+
+      {learning && learning.byService.length > 0 && (
+        <section className="panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">O FUNIL APRENDE</span>
+              <h2>Onde cada serviço converte</h2>
+            </div>
+          </div>
+
+          <div className="perf-table">
+            <div className="perf-row perf-head learn-row">
+              <span>Serviço</span>
+              <span>Em abordagem</span>
+              <span>Contatadas</span>
+              <span>Responderam</span>
+              <span>Reuniões</span>
+              <span>Ganhos</span>
+            </div>
+
+            {learning.byService.map((r) => (
+              <div className="perf-row learn-row" key={r.serviceKey}>
+                <strong>
+                  {DEFAULT_SERVICES.find((s) => s.key === r.serviceKey)?.name ??
+                    "Sem serviço definido"}
+                </strong>
+                <span>{r.prospects}</span>
+                <span>{r.contacted}</span>
+                <span>
+                  {r.replied}
+                  {r.contacted > 0 ? ` (${pct(r.replied / r.contacted)})` : ""}
+                </span>
+                <span>{r.meetings}</span>
+                <span>{r.won}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="muted small">
+            {learning.aiSent > 0
+              ? `Rascunhos do Claude enviados: ${learning.aiSent}; você editou ${learning.aiEdited} (${pct(learning.aiEdited / learning.aiSent)}). Quanto menor a taxa de edição, mais o agente acerta o seu tom.`
+              : "Ainda não há rascunhos do Claude enviados."}{" "}
+            Com poucas conversas, as taxas variam muito: use como tendência, não como regra.
+          </p>
+        </section>
+      )}
 
       <section className="panel">
         <div className="panel-title">

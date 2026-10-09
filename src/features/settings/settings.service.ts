@@ -3,6 +3,7 @@ import { getSupabase, nowIso, unwrap } from "../../lib/store";
 export const SECRET_KEYS = [
   "google_api_key",
   "openai_api_key",
+  "anthropic_api_key",
 ] as const;
 
 export type SettingKey =
@@ -16,6 +17,7 @@ export type SettingKey =
   | "seller_name"
   | "company_name"
   | "openai_model"
+  | "anthropic_model"
   | "data_repairs";
 
 export const DEFAULTS: Partial<Record<SettingKey, string>> = {
@@ -24,6 +26,7 @@ export const DEFAULTS: Partial<Record<SettingKey, string>> = {
   min_score: "50",
   company_name: "Creava Digital",
   openai_model: "gpt-4o-mini",
+  anthropic_model: "claude-sonnet-5-5",
 };
 
 export function isSecret(key: string): boolean {
