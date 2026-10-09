@@ -1,7 +1,7 @@
 import { fetchAllPages, getSupabase, unwrap } from "../../lib/store";
 
 export async function recordApiUsage(input: {
-  provider: "GOOGLE_PLACES" | "OPENAI" | "CNPJ" | "WEBSITE";
+  provider: "GOOGLE_PLACES" | "OPENAI" | "ANTHROPIC" | "CNPJ" | "WEBSITE";
   operation: string;
   requests?: number;
   tokens?: number;

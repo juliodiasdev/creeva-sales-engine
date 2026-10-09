@@ -18,6 +18,7 @@ import { runDiagnostics } from "../features/diagnostics/diagnostics.service";
 import type { DiagnosticStep } from "../features/diagnostics/diagnostics.service";
 
 import { testOpenAiConnection } from "../features/ai/openai.client";
+import { testClaudeConnection } from "../features/ai/anthropic.client";
 
 import {
   clearApiKeys,
@@ -45,11 +46,13 @@ const FIELDS: [SettingKey, string, string][] = [
   ["follow_up_delay_days", "Dias até o retorno (follow-up)", "2"],
   ["proposal_follow_up_days", "Dias até o retorno da proposta", "3"],
   ["openai_model", "Modelo OpenAI", "gpt-4o-mini"],
+  ["anthropic_model", "Modelo Claude (conversas)", "claude-sonnet-5-5"],
 ];
 
 const SECRETS: [SettingKey, string][] = [
   ["google_api_key", "Google (busca de empresas)"],
-  ["openai_api_key", "OpenAI (IA)"],
+  ["openai_api_key", "OpenAI (análise e gargalos)"],
+  ["anthropic_api_key", "Claude / Anthropic (conversas)"],
 ];
 
 type DangerAction = "keys" | "data" | "all";
@@ -60,7 +63,7 @@ const DANGER: Record<
 > = {
   keys: {
     label: "Remover chaves de API",
-    description: "Apaga as chaves do Google e da OpenAI. Os dados são mantidos.",
+    description: "Apaga as chaves do Google, da OpenAI e da Anthropic. Os dados são mantidos.",
     run: clearApiKeys,
   },
   data: {
@@ -197,6 +200,17 @@ export function SettingsPage() {
     }
   }
 
+  async function handleTestClaude() {
+    try {
+      setError("");
+      setMessage("Testando Claude…");
+      setMessage(await testClaudeConnection());
+    } catch (err) {
+      setMessage("");
+      setError(errorMessage(err, "Falha ao testar o Claude."));
+    }
+  }
+
   async function removeSecret(key: SettingKey) {
     await setSetting(key, "");
     await load();
@@ -324,6 +338,15 @@ export function SettingsPage() {
             onClick={() => void handleTestOpenAi()}
           >
             Testar OpenAI
+          </button>
+
+          <button
+            type="button"
+            className="secondary"
+            disabled={!configured.anthropic_api_key}
+            onClick={() => void handleTestClaude()}
+          >
+            Testar Claude
           </button>
         </div>
 

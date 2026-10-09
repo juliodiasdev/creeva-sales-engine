@@ -1092,3 +1092,24 @@ button.small-btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
 .muted.small { font-size: 12px; margin: 0; }
 
 .sig-row { grid-template-columns: 1fr 80px; }
+
+/* ---------- conversas ---------- */
+.conv-layout { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }
+.conv-thread { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.conv-items { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.conv-item { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); color: inherit; cursor: pointer; }
+.conv-item.active { border-color: var(--accent, #7c5cff); }
+.conv-item small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.conv-messages { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow: auto; }
+.bubble { max-width: 78%; padding: 8px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.bubble p { margin: 4px 0 0; white-space: pre-wrap; }
+.bubble small { color: var(--muted); font-size: 11px; }
+.bubble.out { align-self: flex-end; background: color-mix(in srgb, var(--accent, #7c5cff) 14%, var(--surface)); }
+.draft-box textarea, .conv-thread textarea { width: 100%; }
+.warn-box { padding: 10px 12px; border: 1px solid #c9a227; border-radius: var(--radius-sm); }
+@media (max-width: 900px) { .conv-layout { grid-template-columns: 1fr; } }
+
+.learn-row { grid-template-columns: minmax(180px, 2fr) repeat(5, minmax(80px, 1fr)); }
+.conv-item:hover, .conv-item.active, .conv-item:focus-visible { background: var(--surface-2); color: inherit; }
+.conv-item:hover strong, .conv-item.active strong { color: inherit; }
+.conv-item:hover small, .conv-item.active small { color: var(--muted); }

@@ -1,3 +1,4 @@
+import { logOutgoingMessage } from "../agent/conversation.service";
 import {
   completeTaskRepository,
   createTaskRepository,
@@ -201,6 +202,11 @@ export async function markTaskAsSent(
     "MESSAGE_SENT",
     content,
     "MANUAL",
+  );
+
+  // Histórico por empresa: nunca bloqueia o registro do envio.
+  await logOutgoingMessage(prospect.company_id, content).catch((err) =>
+    console.error("histórico de conversa", err),
   );
 
   if (task.type === "FIRST_CONTACT") {

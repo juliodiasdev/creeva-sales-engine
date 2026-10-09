@@ -8,6 +8,7 @@ export type PageId =
   | "dashboard"
   | "prospect"
   | "lists"
+  | "conversations"
   | "companies"
   | "settings";
 
@@ -30,6 +31,12 @@ const ICONS: Record<PageId, ReactNode> = {
     <>
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-4-4" />
+    </>
+  ),
+  conversations: (
+    <>
+      <path d="M4 5h16v11H9l-5 4z" />
+      <path d="M8 9h8M8 12h5" />
     </>
   ),
   lists: (
@@ -64,6 +71,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "today", label: "Hoje", section: "INÍCIO", description: "Seu processo e as tarefas do dia: o que fazer agora para gerar clientes." },
   { id: "prospect", label: "Prospectar", section: "PROCESSO", description: "Busque empresas no Google Maps por nicho, estado e cidade: cada busca gera uma lista." },
   { id: "lists", label: "Listas", section: "PROCESSO", description: "Cada prospecção vira uma lista: enriqueça, qualifique e inicie a abordagem." },
+  { id: "conversations", label: "Conversas", section: "PROCESSO", description: "Histórico por empresa: registre as respostas e deixe o Claude preparar a próxima mensagem." },
   { id: "companies", label: "Base geral", section: "BASE", description: "Todas as empresas e contatos coletados, sem duplicados, com exportação para planilha." },
   { id: "dashboard", label: "Resultados", section: "ANÁLISE", description: "Números reais: respostas, reuniões, propostas e receita." },
   { id: "settings", label: "Configurações", section: "CONFIGURAÇÃO", description: "Serviços, integrações, backup e preferências." },

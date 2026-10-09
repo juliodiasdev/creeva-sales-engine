@@ -1,3 +1,5 @@
+import { isCompanySuppressed } from "../compliance/suppression.service";
+
 import {
   createProspectRepository,
   getProspectContextRepository,
@@ -23,6 +25,12 @@ export async function createProspect(
   if (!companyId) {
     throw new Error(
       "Empresa inválida.",
+    );
+  }
+
+  if (await isCompanySuppressed(companyId)) {
+    throw new Error(
+      "Esta empresa pediu para não ser contatada (lista de supressão).",
     );
   }
 

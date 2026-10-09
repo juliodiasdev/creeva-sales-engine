@@ -35,6 +35,7 @@ import {
 import { label, TASK_TYPE_LABEL, PRIORITY_LABEL } from "../lib/labels";
 import { STATUS_LABEL } from "../features/prospects/prospect.labels";
 import type { ProspectStatus } from "../features/prospects/prospect.types";
+import { listConversationSummaries } from "../features/agent/conversation.service";
 import { getProcessOverview } from "../features/lists/lists.service";
 import type { ProcessOverview } from "../features/lists/lists.service";
 import type { PageId } from "../components/Sidebar";
@@ -58,8 +59,13 @@ interface Props {
 export function TodayPage({ onOpenProspect, onOpenList, onNavigate }: Props) {
   const [process, setProcess] = useState<ProcessOverview | null>(null);
 
+  const [awaitingReply, setAwaitingReply] = useState(0);
+
   useEffect(() => {
     void getProcessOverview().then(setProcess).catch(() => setProcess(null));
+    void listConversationSummaries()
+      .then((rows) => setAwaitingReply(rows.filter((r) => r.awaitingReply).length))
+      .catch(() => setAwaitingReply(0));
   }, []);
 
   const [tasks, setTasks] = useState<
@@ -251,6 +257,9 @@ export function TodayPage({ onOpenProspect, onOpenList, onNavigate }: Props) {
           </button>
           <button type="button" className="step" disabled>
             <strong>{process.ready}</strong><span>Em abordagem</span>
+          </button>
+          <button type="button" className="step" onClick={() => onNavigate("conversations")}>
+            <strong>{awaitingReply}</strong><span>Respostas para tratar</span>
           </button>
         </div>
       ) : (

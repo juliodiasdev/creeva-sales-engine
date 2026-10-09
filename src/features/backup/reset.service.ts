@@ -4,7 +4,8 @@ import { ensurePlaybookSeed } from "../playbook/playbook.service";
 import { ensureServicesSeed } from "../services/services.service";
 
 // Configuração (playbook, serviços, settings) não é "dado de teste".
-const CONFIG_TABLES = ["settings", "playbook_scripts", "services"];
+// "suppressions" é compromisso legal (quem pediu para não ser contatado): nunca é apagada em reset.
+const CONFIG_TABLES = ["settings", "playbook_scripts", "services", "suppressions"];
 
 const BUSINESS_TABLES = TABLE_ORDER.filter(
   (t) => !CONFIG_TABLES.includes(t),
@@ -26,7 +27,7 @@ export async function resetSequences(): Promise<void> {
   unwrap(await getSupabase().rpc("reset_identity_sequences"));
 }
 
-/** Remove somente as chaves de API (Google e OpenAI). */
+/** Remove somente as chaves de API (Google, OpenAI e Anthropic). */
 export async function clearApiKeys(): Promise<void> {
   unwrap(
     await getSupabase()

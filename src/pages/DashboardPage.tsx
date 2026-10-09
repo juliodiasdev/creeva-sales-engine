@@ -2,24 +2,29 @@ import { useEffect, useState } from "react";
 
 import { getAnalysisSummary, getDashboardMetrics } from "../features/dashboard/dashboard.service";
 import type { AnalysisSummary, DashboardMetrics } from "../features/dashboard/dashboard.service";
+import { getLearningSummary } from "../features/agent/learning.service";
+import type { LearningSummary } from "../features/agent/learning.service";
 import { loadListsWithStats } from "../features/lists/lists.service";
 import type { ListWithStats } from "../features/lists/lists.service";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage, formatCurrency } from "../lib/format";
 import { SIGNAL_LABEL } from "../lib/labels";
+import { DEFAULT_SERVICES } from "../features/services/services.service";
 
 const pct = (v: number) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 
 export function DashboardPage() {
   const [m, setM] = useState<DashboardMetrics | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisSummary | null>(null);
+  const [learning, setLearning] = useState<LearningSummary | null>(null);
   const [lists, setLists] = useState<ListWithStats[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([getDashboardMetrics(), loadListsWithStats(), getAnalysisSummary()])
-      .then(([metrics, l, a]) => {
+    Promise.all([getDashboardMetrics(), loadListsWithStats(), getAnalysisSummary(), getLearningSummary()])
+      .then(([metrics, l, a, lr]) => {
+        setLearning(lr);
         setAnalysis(a);
         setM(metrics);
         setLists(l);
@@ -153,6 +158,52 @@ export function DashboardPage() {
 
         <p className="muted small">A porcentagem à direita é a conversão em relação à etapa anterior.</p>
       </section>
+
+      {learning && learning.byService.length > 0 && (
+        <section className="panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">O FUNIL APRENDE</span>
+              <h2>Onde cada serviço converte</h2>
+            </div>
+          </div>
+
+          <div className="perf-table">
+            <div className="perf-row perf-head learn-row">
+              <span>Serviço</span>
+              <span>Em abordagem</span>
+              <span>Contatadas</span>
+              <span>Responderam</span>
+              <span>Reuniões</span>
+              <span>Ganhos</span>
+            </div>
+
+            {learning.byService.map((r) => (
+              <div className="perf-row learn-row" key={r.serviceKey}>
+                <strong>
+                  {DEFAULT_SERVICES.find((s) => s.key === r.serviceKey)?.name ??
+                    "Sem serviço definido"}
+                </strong>
+                <span>{r.prospects}</span>
+                <span>{r.contacted}</span>
+                <span>
+                  {r.replied}
+                  {r.contacted > 0 ? ` (${pct(r.replied / r.contacted)})` : ""}
+                </span>
+                <span>{r.meetings}</span>
+                <span>{r.won}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="muted small">
+            {learning.aiSent > 0
+              ? `Rascunhos do Claude enviados: ${learning.aiSent}; você editou ${learning.aiEdited} (${pct(learning.aiEdited / learning.aiSent)}). Quanto menor a taxa de edição, mais o agente acerta o seu tom.`
+              : "Ainda não há rascunhos do Claude enviados."}{" "}
+            Com poucas conversas, as taxas variam muito: use como tendência, não como regra.
+          </p>
+        </section>
+      )}
 
       <section className="panel">
         <div className="panel-title">

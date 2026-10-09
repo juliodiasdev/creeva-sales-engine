@@ -104,8 +104,19 @@ export interface AiApproach {
   evidence_used: string[];
 }
 
+/** Gargalo: problema do negócio que a Creava resolve, sempre com evidência real. */
+export interface AiBottleneck {
+  title: string;
+  /** Tipos de sinais REAIS (signals) que sustentam o gargalo. */
+  evidence: string[];
+  service_key: string;
+  impact: string;
+  confidence: number;
+}
+
 export interface AiPlanResult {
   analysis: AiAnalysisResult;
+  bottlenecks: AiBottleneck[];
   services: AiServiceRecommendation[];
   approaches: AiApproach[];
   /** Itens descartados por não respeitarem o catálogo/evidências. */
@@ -152,6 +163,39 @@ export function validatePlan(
     }
   }
 
+  // Gargalo sem evidência existente, sem serviço do catálogo ou sem
+  // texto é DESCARTADO: nada de problema afirmado sem dado real.
+  const bottlenecks: AiBottleneck[] = [];
+
+  for (const item of Array.isArray(obj.bottlenecks) ? obj.bottlenecks : []) {
+    const b = item as Record<string, unknown>;
+    const evidence = Array.isArray(b?.evidence) ? b.evidence.map(String) : [];
+    const confidence = Number(b?.confidence);
+
+    const valid =
+      typeof b?.title === "string" &&
+      b.title.trim().length > 0 &&
+      typeof b.service_key === "string" &&
+      ctx.serviceKeys.includes(b.service_key) &&
+      evidence.length > 0 &&
+      evidence.every((t) => ctx.signalTypes.includes(t)) &&
+      Number.isFinite(confidence) &&
+      confidence >= 0 &&
+      confidence <= 1;
+
+    if (valid) {
+      bottlenecks.push({
+        title: String(b.title).trim().slice(0, 200),
+        evidence,
+        service_key: String(b.service_key),
+        impact: String(b.impact ?? "").trim().slice(0, 400),
+        confidence,
+      });
+    } else {
+      dropped++;
+    }
+  }
+
   const approaches: AiApproach[] = [];
 
   for (const item of Array.isArray(obj.approaches) ? obj.approaches : []) {
@@ -182,5 +226,5 @@ export function validatePlan(
     }
   }
 
-  return { analysis, services, approaches, dropped };
+  return { analysis, bottlenecks, services, approaches, dropped };
 }
