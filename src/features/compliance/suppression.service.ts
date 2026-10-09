@@ -3,7 +3,7 @@ import { fetchAllPages, getSupabase, unwrap } from "../../lib/store";
 import { getCompanyRepository } from "../companies/company.repository";
 import { listChannelsRepository } from "../contacts/channels.repository";
 
-export type SuppressionKind = "PHONE" | "EMAIL" | "DOMAIN" | "CNPJ";
+export type SuppressionKind = "PHONE" | "EMAIL" | "DOMAIN" | "CNPJ" | "COMPANY";
 
 export interface Suppression {
   id: number;
@@ -30,6 +30,8 @@ async function identifiersOf(
     if (v) ids.set(`${kind}:${v}`, { kind, value: v });
   };
 
+  // Garante proteção mesmo sem telefone, e-mail, site ou CNPJ.
+  add("COMPANY", String(companyId));
   add("PHONE", company.phone_normalized);
   add("DOMAIN", company.domain);
   add("CNPJ", company.cnpj?.replace(/\D/g, ""));
@@ -100,12 +102,40 @@ export async function isCompanySuppressed(
 }
 
 /**
- * Sinais de que o contato pediu para parar. É só um ALERTA: quem decide
- * (e registra a supressão) é o usuário, para não bloquear por engano.
+ * Pedido FORMAL de parar (LGPD/WhatsApp): vira supressão automática, sem
+ * depender de ninguém lembrar. Só frases inequívocas entram aqui.
  */
-const OPT_OUT =
-  /\b(pare|parar|pode parar|para de (me )?(mandar|enviar|chamar)|n[ãa]o (me )?(chame|mande|envie|procure)|n[ãa]o (quero|tenho interesse)|sem interesse|me (tire|remova|exclua|retire)|remov(a|er) (meu|o meu)|sair da lista|descadastr\w*|spam|denunci\w*|bloque(ar|ei|ando))\b/i;
+const HARD_STOP =
+  /\b(descadastr\w*|pare de|parem de|pode parar|favor parar|para de (me )?(mandar|enviar|chamar|ligar)|n[ãa]o (me )?(chame|mande|envie|ligue|procure)( mais)?|me (tire|retire|remova|exclua)\b|remov\w+ (meu|o meu) (n[úu]mero|contato|cadastro)|sair da lista|spam|denunci\w*|lgpd|bloque(ar|ei|ando)|chega de|parem|n[ãa]o (quero|desejo) (mais )?(receber|mensagens?|contato)|n[ãa]o me incomod\w*|(me )?deixa(m)? (a gente |eu )?em paz|tir\w+ (meu|o meu) (n[úu]mero|contato))/i;
 
+/** Recusa comercial: não é opt-out formal, só um alerta para você decidir. */
+const SOFT_NO =
+  /\b(n[ãa]o (quero|tenho interesse)|sem interesse|agora n[ãa]o|n[ãa]o precisamos|j[áa] tenho (site|sistema|fornecedor))/i;
+
+export function looksLikeHardStop(text: string): boolean {
+  return HARD_STOP.test(text);
+}
+
+export function looksLikeSoftNo(text: string): boolean {
+  return SOFT_NO.test(text);
+}
+
+/** Qualquer sinal de recusa (alerta na tela; o rascunho fica bloqueado). */
 export function looksLikeOptOut(text: string): boolean {
-  return OPT_OUT.test(text);
+  return looksLikeHardStop(text) || looksLikeSoftNo(text);
+}
+
+/** Desfaz uma supressão feita por engano (remove os identificadores da empresa). */
+export async function unsuppressCompany(companyId: number): Promise<void> {
+  const rows = await identifiersOf(companyId);
+
+  for (const r of rows) {
+    unwrap(
+      await getSupabase()
+        .from("suppressions")
+        .delete()
+        .eq("kind", r.kind)
+        .eq("value", r.value),
+    );
+  }
 }

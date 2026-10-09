@@ -1,3 +1,10 @@
+import { isCompanySuppressed } from "../compliance/suppression.service";
+import { confirmOptOut } from "../agent/conversation.service";
+import {
+  getConversationRepository,
+  getOrCreateConversationRepository,
+  updateConversationRepository,
+} from "../agent/agent.repository";
 import {
   fetchAllPages,
   getSupabase,
@@ -197,6 +204,12 @@ export async function mergeCompanies(
     prospectOf(duplicateId),
   ]);
 
+  // Se QUALQUER um dos dois pediu para não ser contatado, o registro
+  // mesclado herda o pedido (é a mesma empresa).
+  const wasSuppressed =
+    (await isCompanySuppressed(masterId)) ||
+    (await isCompanySuppressed(duplicateId));
+
   // 1) histórico e fontes do duplicado passam para o principal
   for (const table of CHILD_TABLES) {
     unwrap(
@@ -211,6 +224,29 @@ export async function mergeCompanies(
   unwrap(
     await supabase.from("signals").delete().eq("company_id", duplicateId),
   );
+
+  // histórico de conversa: mensagens do duplicado vão para a conversa do principal
+  const dupConversation = await getConversationRepository(duplicateId);
+
+  if (dupConversation) {
+    const masterConversation = await getOrCreateConversationRepository(masterId);
+
+    unwrap(
+      await supabase
+        .from("conversation_messages")
+        .update({ conversation_id: masterConversation.id, company_id: masterId })
+        .eq("conversation_id", dupConversation.id),
+    );
+
+    if (dupConversation.opted_out === 1) {
+      await updateConversationRepository(masterConversation.id, { opted_out: 1 });
+    }
+
+    unwrap(
+      await supabase.from("conversations").delete().eq("id", dupConversation.id),
+    );
+  }
+
 
   // 2) prospect
   let prospectsMerged = false;
@@ -249,6 +285,14 @@ export async function mergeCompanies(
   unwrap(
     await supabase.from("companies").delete().eq("id", duplicateId),
   );
+
+  // 3b) a mesclagem herda o pedido de "não contatar" de qualquer um dos dois
+  if (wasSuppressed) {
+    await confirmOptOut(
+      masterId,
+      "Mesclada com empresa que pediu para não ser contatada",
+    );
+  }
 
   // 4) completa o principal com o que só o duplicado tinha
   const filled: Record<string, unknown> = {};

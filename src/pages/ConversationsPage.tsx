@@ -11,6 +11,7 @@ import {
   loadThread,
   logOutgoingMessage,
   recordIncomingMessage,
+  restoreContact,
 } from "../features/agent/conversation.service";
 import type {
   ConversationSummary,
@@ -249,10 +250,20 @@ function ThreadView({
         )}
 
         {blocked && (
-          <p className="error">
-            Esta empresa pediu para não ser contatada (lista de supressão).
+          <div className="warn-box">
+            <strong>Esta empresa pediu para não ser contatada (lista de supressão).</strong>{" "}
             Nenhuma mensagem será preparada.
-          </p>
+            <div className="outreach-actions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={!!busy}
+                onClick={() => void run("restore", () => restoreContact(companyId))}
+              >
+                Foi engano: desfazer
+              </button>
+            </div>
+          </div>
         )}
 
         {thread.optOutSuspected && !blocked && (

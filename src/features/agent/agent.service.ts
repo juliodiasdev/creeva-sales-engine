@@ -4,6 +4,7 @@ import type { ClaudeChatJson } from "../ai/anthropic.client";
 import { getLatestAnalysis, parseBottlenecks } from "../ai/ai.service";
 import { getCompanyRepository } from "../companies/company.repository";
 import { isCompanySuppressed, looksLikeOptOut } from "../compliance/suppression.service";
+import { pendingOptOut } from "./conversation.service";
 import { listSignalsRepository } from "../enrichment/enrichment.repository";
 import { listServices } from "../services/services.service";
 import { getSetting } from "../settings/settings.service";
@@ -44,8 +45,19 @@ export async function getWinningExamples(
   limit = 3,
 ): Promise<string[]> {
   const all = await listAllMessagesRepository();
+  // Só conta resposta de interesse: pedidos de parar nunca viram exemplo.
+  const firstIn = new Map<number, string>();
+
+  for (const m of all) {
+    if (m.direction === "IN" && !firstIn.has(Number(m.company_id))) {
+      firstIn.set(Number(m.company_id), m.body);
+    }
+  }
+
   const repliedCompanies = new Set(
-    all.filter((m) => m.direction === "IN").map((m) => Number(m.company_id)),
+    [...firstIn.entries()]
+      .filter(([, body]) => !looksLikeOptOut(body))
+      .map(([id]) => id),
   );
 
   const examples: string[] = [];
@@ -124,7 +136,7 @@ export async function draftReply(
 
   const lastIn = [...sent].reverse().find((m) => m.direction === "IN");
 
-  if (!options.ignoreOptOutWarning && lastIn && looksLikeOptOut(lastIn.body)) {
+  if (!options.ignoreOptOutWarning && pendingOptOut(messages)) {
     throw new Error(
       "A última mensagem parece um pedido para parar. Confirme em “Não contatar mais” ou escolha continuar mesmo assim.",
     );

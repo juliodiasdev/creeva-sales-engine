@@ -72,6 +72,10 @@ export function parseJsonText(text: string): unknown {
   }
 }
 
+const MAX_TOKENS = 4096;
+const RETRY_STATUS = [429, 500, 502, 503, 529];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export const claudeChatJson: ClaudeChatJson = async (system, turns) => {
   const apiKey = await getSetting("anthropic_api_key");
 
@@ -81,20 +85,30 @@ export const claudeChatJson: ClaudeChatJson = async (system, turns) => {
 
   const model = (await getSetting("anthropic_model")) ?? "claude-sonnet-5-5";
 
-  const response = await httpFetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1024,
-      system,
-      messages: turns,
-    }),
-  });
+  const send = () =>
+    httpFetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        // O raciocínio do modelo também consome max_tokens: folga evita resposta cortada.
+        max_tokens: MAX_TOKENS,
+        system,
+        messages: turns,
+      }),
+    });
+
+  // Até 3 tentativas em limite de requisições / sobrecarga / erro do servidor.
+  let response = await send();
+
+  for (let attempt = 1; attempt < 3 && RETRY_STATUS.includes(response.status); attempt++) {
+    await sleep(attempt * 1500);
+    response = await send();
+  }
 
   if (!response.ok) {
     throw new Error(await describeAnthropicError(response));
@@ -102,6 +116,7 @@ export const claudeChatJson: ClaudeChatJson = async (system, turns) => {
 
   const data = (await response.json()) as {
     content?: { type: string; text?: string }[];
+    stop_reason?: string;
     usage?: { input_tokens?: number; output_tokens?: number };
   };
 
@@ -111,6 +126,15 @@ export const claudeChatJson: ClaudeChatJson = async (system, turns) => {
     operation: "messages",
     tokens: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
   });
+
+  // Recusa ou resposta cortada nunca viram rascunho: o humano assume.
+  if (data.stop_reason === "refusal") {
+    throw new Error("O Claude recusou responder a esta mensagem. Escreva você mesmo.");
+  }
+
+  if (data.stop_reason === "max_tokens") {
+    throw new Error("A resposta do Claude foi cortada. Tente gerar de novo.");
+  }
 
   const text = data.content
     ?.filter((part) => part.type === "text")

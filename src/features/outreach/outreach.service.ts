@@ -1,3 +1,4 @@
+import { isCompanySuppressed } from "../compliance/suppression.service";
 import { logOutgoingMessage } from "../agent/conversation.service";
 import {
   completeTaskRepository,
@@ -73,6 +74,12 @@ async function loadDraftContext(taskId: number) {
   if (!prospect) {
     throw new Error(
       "Prospect não encontrado.",
+    );
+  }
+
+  if (await isCompanySuppressed(prospect.company_id)) {
+    throw new Error(
+      "Esta empresa pediu para não ser contatada: nenhuma abordagem pode ser preparada.",
     );
   }
 

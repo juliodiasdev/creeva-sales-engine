@@ -26,6 +26,7 @@ import {
   listConversationSummaries,
   loadThread,
   recordIncomingMessage,
+  restoreContact,
 } from "./conversation.service";
 import { approveDraft, draftReply } from "./agent.service";
 import { getLearningSummary } from "./learning.service";
@@ -61,6 +62,23 @@ describe("looksLikeOptOut", () => {
     expect(looksLikeOptOut("Por favor, pare de me mandar mensagem")).toBe(true);
     expect(looksLikeOptOut("Não tenho interesse, obrigado")).toBe(true);
     expect(looksLikeOptOut("Tenho interesse, pode me ligar amanhã?")).toBe(false);
+  });
+
+  it("separa pedido formal de parar (automático) de recusa comercial (alerta)", async () => {
+    const { looksLikeHardStop, looksLikeSoftNo } = await import("../compliance/suppression.service");
+
+    for (const t of ["Pare de me mandar mensagem", "Quero me descadastrar", "Isso é spam, vou denunciar", "Não me chame mais", "me remova da lista, LGPD"]) {
+      expect(looksLikeHardStop(t), t).toBe(true);
+    }
+
+    for (const t of ["Não tenho interesse, obrigado", "Agora não, talvez ano que vem", "Já tenho site"]) {
+      expect(looksLikeHardStop(t), t).toBe(false);
+      expect(looksLikeSoftNo(t), t).toBe(true);
+    }
+
+    for (const t of ["Pode me ligar amanhã", "Parece interessante, como funciona?", "Vou parar para ver isso com meu sócio"]) {
+      expect(looksLikeOptOut(t), t).toBe(false);
+    }
   });
 });
 
@@ -170,14 +188,24 @@ describe("agente de conversa", () => {
     expect(summary).toMatchObject({ prospectId, stage: "REPLIED", awaitingReply: false });
   });
 
-  it("pedido para parar bloqueia rascunho, suprime a empresa e impede novo prospect", async () => {
+  it("recusa comercial só alerta; pedido formal de parar suprime sozinho e pode ser desfeito", async () => {
     await withBriefing();
     await createProspect(companyId);
-    const { optOutSuspected } = await recordIncomingMessage(companyId, "Não tenho interesse, pare de mandar mensagem");
-    expect(optOutSuspected).toBe(true);
 
+    const soft = await recordIncomingMessage(companyId, "Não tenho interesse, obrigado");
+    expect(soft).toMatchObject({ optOutSuspected: true, autoSuppressed: false });
     await expect(draftReply(companyId, {}, claude(good))).rejects.toThrow(/pedido para parar/);
     await expect(draftReply(companyId, { ignoreOptOutWarning: true }, claude(good))).resolves.toBeTruthy();
+    expect(await isCompanySuppressed(companyId)).toBe(false);
+
+    const hard = await recordIncomingMessage(companyId, "Pare de me mandar mensagem, vou denunciar");
+    expect(hard.autoSuppressed).toBe(true);
+    expect(await isCompanySuppressed(companyId)).toBe(true);
+    expect((await listConversationSummaries())[0].stage).toBe("DO_NOT_CONTACT");
+
+    await restoreContact(companyId);
+    expect(await isCompanySuppressed(companyId)).toBe(false);
+    expect((await listConversationSummaries())[0].stage).toBe("NURTURE");
 
     await confirmOptOut(companyId);
 
@@ -190,5 +218,94 @@ describe("agente de conversa", () => {
     if (other.created) {
       await expect(createProspect(other.id)).rejects.toThrow(/não ser contatada/);
     }
+  });
+});
+
+describe("lista de supressão e backup", () => {
+  it("restaurar um backup nunca apaga quem pediu para não ser contatado", async () => {
+    db = await createMigratedTestDb();
+    const { exportBackup, importBackup } = await import("../backup/backup.service");
+    const { suppressCompany, listSuppressions } = await import("../compliance/suppression.service");
+
+    const empty = await exportBackup(); // backup feito antes do pedido
+    const id = (await importCompany({ name: "Clínica X", phone: "(65) 98888-7777" }, "MANUAL")).id;
+    await suppressCompany(id, "pediu para parar");
+    const before = (await listSuppressions()).length;
+    expect(before).toBeGreaterThan(0);
+
+    await importBackup(empty);
+    expect((await listSuppressions()).length).toBe(before);
+
+    // Restaurar um backup que também contém a lista não duplica linhas.
+    const full = await exportBackup();
+    await importBackup(full);
+    expect((await listSuppressions()).length).toBe(before);
+  });
+});
+
+describe("supressão: caminhos paralelos", () => {
+  beforeEach(async () => {
+    db = await createMigratedTestDb();
+    await ensureServicesSeed();
+  });
+
+  it('marcar "Não contatar" no funil suprime e não pode ser reaberto sem desfazer', async () => {
+    const { changeProspectStatus } = await import("../workflow/workflow.service");
+    const id = (await importCompany({ name: "Sem Contato" }, "MANUAL")).id; // sem telefone/e-mail/site
+    const prospectId = await createProspect(id);
+
+    await changeProspectStatus(prospectId, "DO_NOT_CONTACT");
+    expect(await isCompanySuppressed(id)).toBe(true); // protegida mesmo sem identificadores
+
+    await expect(changeProspectStatus(prospectId, "READY")).rejects.toThrow(/supressão/);
+
+    await restoreContact(id);
+    await expect(changeProspectStatus(prospectId, "READY")).resolves.toBeUndefined();
+  });
+
+  it("mesclar com empresa suprimida herda o pedido e preserva o histórico", async () => {
+    const { mergeCompanies } = await import("../duplicates/duplicates.service");
+    const a = (await importCompany({ name: "Clínica A", city: "Cuiabá" }, "MANUAL")).id;
+    const b = (await importCompany({ name: "Clínica B", city: "Cuiabá" }, "MANUAL")).id;
+
+    await recordIncomingMessage(b, "Oi, tenho dúvidas");
+    await confirmOptOut(b);
+    expect(await isCompanySuppressed(a)).toBe(false);
+
+    await mergeCompanies(a, b);
+
+    expect(await isCompanySuppressed(a)).toBe(true);
+    const thread = await loadThread(a);
+    expect(thread.messages.map((m) => m.body)).toEqual(["Oi, tenho dúvidas"]);
+  });
+
+  it("nova mensagem do contato invalida rascunhos antigos", async () => {
+    const id = (await importCompany({ name: "Clínica C", city: "Cuiabá" }, "MANUAL")).id;
+    await planCompanyWithAi(id, vi.fn().mockResolvedValue({
+      json: plan([]),
+      model: "m",
+    }));
+    await recordIncomingMessage(id, "Oi");
+    const out = await draftReply(id, {}, vi.fn().mockResolvedValue({
+      json: { message: "Olá!", intent: "CONTINUE", handoff_reason: null, evidence_used: [] },
+      model: "m",
+    }));
+
+    await recordIncomingMessage(id, "Na verdade, pode me explicar melhor?");
+    await expect(approveDraft(out.messageId, "Olá!")).rejects.toThrow(/já tratado/);
+  });
+
+  it("pedidos de parar não viram exemplo vencedor", async () => {
+    const { getWinningExamples } = await import("./agent.service");
+    const { logOutgoingMessage } = await import("./conversation.service");
+    const a = (await importCompany({ name: "A1", city: "Cuiabá" }, "MANUAL")).id;
+    const b = (await importCompany({ name: "B1", city: "Cuiabá" }, "MANUAL")).id;
+
+    await logOutgoingMessage(a, "Mensagem que funcionou");
+    await recordIncomingMessage(a, "Gostei, me conte mais");
+    await logOutgoingMessage(b, "Mensagem que irritou");
+    await recordIncomingMessage(b, "Não tenho interesse");
+
+    expect(await getWinningExamples(999)).toEqual(["Mensagem que funcionou"]);
   });
 });

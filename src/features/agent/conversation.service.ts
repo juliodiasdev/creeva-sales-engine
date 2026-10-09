@@ -5,8 +5,10 @@ import { recordReply, changeProspectStatus } from "../workflow/workflow.service"
 import { cancelOpenTasksRepository } from "../tasks/task.repository";
 import {
   isCompanySuppressed,
+  looksLikeHardStop,
   looksLikeOptOut,
   suppressCompany,
+  unsuppressCompany,
 } from "../compliance/suppression.service";
 
 import {
@@ -17,6 +19,7 @@ import {
   listAllMessagesRepository,
   listMessagesRepository,
   updateConversationRepository,
+  updateMessageRepository,
 } from "./agent.repository";
 
 import type { Conversation, ConversationMessage } from "./agent.types";
@@ -37,18 +40,29 @@ export async function loadThread(companyId: number): Promise<Thread> {
     isCompanySuppressed(companyId),
   ]);
 
-  const lastIn = [...messages].reverse().find((m) => m.direction === "IN");
-  const lastActive = [...messages]
-    .reverse()
-    .find((m) => m.status !== "DRAFT");
-
   return {
     conversation,
     messages,
     suppressed: suppressed || conversation?.opted_out === 1,
-    optOutSuspected:
-      !!lastIn && lastActive?.id === lastIn.id && looksLikeOptOut(lastIn.body),
+    optOutSuspected: pendingOptOut(messages),
   };
+}
+
+async function discardPendingDrafts(companyId: number): Promise<void> {
+  for (const m of await listMessagesRepository(companyId)) {
+    if (m.status === "DRAFT") {
+      await updateMessageRepository(m.id, { status: "DISCARDED" });
+    }
+  }
+}
+
+/** Há pedido de parar em alguma mensagem recebida depois do nosso último envio? */
+export function pendingOptOut(messages: ConversationMessage[]): boolean {
+  const sent = messages.filter((m) => m.status !== "DRAFT");
+  const lastOut = [...sent].reverse().findIndex((m) => m.direction === "OUT");
+  const tail = lastOut === -1 ? sent : sent.slice(sent.length - lastOut);
+
+  return tail.some((m) => m.direction === "IN" && looksLikeOptOut(m.body));
 }
 
 /**
@@ -83,13 +97,21 @@ export async function logOutgoingMessage(
 export async function recordIncomingMessage(
   companyId: number,
   body: string,
-): Promise<{ messageId: number; optOutSuspected: boolean }> {
+): Promise<{
+  messageId: number;
+  optOutSuspected: boolean;
+  /** Pedido formal de parar: a empresa já foi suprimida automaticamente. */
+  autoSuppressed: boolean;
+}> {
   const text = body.trim();
 
   if (!text) throw new Error("Cole a resposta recebida.");
 
   const conversation = await getOrCreateConversationRepository(companyId);
   const prospect = await findProspectByCompanyRepository(companyId);
+
+  // Qualquer rascunho pendente ficou desatualizado com a nova mensagem.
+  await discardPendingDrafts(companyId);
 
   const messageId = await insertMessageRepository({
     conversationId: conversation.id,
@@ -115,7 +137,31 @@ export async function recordIncomingMessage(
     }
   }
 
-  return { messageId, optOutSuspected: looksLikeOptOut(text) };
+  // Pedido formal de parar é respeitado na hora, antes de qualquer IA.
+  if (looksLikeHardStop(text)) {
+    await confirmOptOut(companyId, `Pedido automático detectado: "${text.slice(0, 120)}"`);
+
+    return { messageId, optOutSuspected: false, autoSuppressed: true };
+  }
+
+  return { messageId, optOutSuspected: looksLikeOptOut(text), autoSuppressed: false };
+}
+
+/** Desfaz um "não contatar" feito por engano (a empresa volta para Nutrição). */
+export async function restoreContact(companyId: number): Promise<void> {
+  const conversation = await getConversationRepository(companyId);
+
+  await unsuppressCompany(companyId);
+
+  if (conversation) {
+    await updateConversationRepository(conversation.id, { opted_out: 0 });
+  }
+
+  const prospect = await findProspectByCompanyRepository(companyId);
+
+  if (prospect?.status === "DO_NOT_CONTACT") {
+    await changeProspectStatus(Number(prospect.id), "NURTURE");
+  }
 }
 
 /**
@@ -130,6 +176,7 @@ export async function confirmOptOut(
 
   await suppressCompany(companyId, reason);
   await updateConversationRepository(conversation.id, { opted_out: 1 });
+  await discardPendingDrafts(companyId);
 
   const prospect = await findProspectByCompanyRepository(companyId);
 
@@ -187,7 +234,8 @@ export async function listConversationSummaries(): Promise<
       stage: p.status,
       lastBody: last?.body ?? null,
       lastAt: last?.created_at ?? null,
-      awaitingReply: last?.direction === "IN",
+      awaitingReply:
+        last?.direction === "IN" && p.status !== "DO_NOT_CONTACT",
       hasDraft: list.some((m) => m.status === "DRAFT"),
       optedOut: p.status === "DO_NOT_CONTACT",
       messageCount: sent.length,

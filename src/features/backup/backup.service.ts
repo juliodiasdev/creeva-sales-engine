@@ -107,6 +107,9 @@ export async function importBackup(raw: unknown): Promise<void> {
   const supabase = getSupabase();
 
   for (const table of [...TABLE_ORDER].reverse()) {
+    // A lista de supressão é compromisso legal: restaurar um backup nunca a apaga.
+    if (table === "suppressions") continue;
+
     if (table === "settings") {
       unwrap(
         await supabase
@@ -133,7 +136,21 @@ export async function importBackup(raw: unknown): Promise<void> {
     );
 
     for (let i = 0; i < rows.length; i += CHUNK) {
-      unwrap(await supabase.from(table).insert(rows.slice(i, i + CHUNK)));
+      const chunk = rows.slice(i, i + CHUNK);
+
+      if (table === "suppressions") {
+        // Mescla com a lista atual (sem ids para não colidir com os existentes).
+        unwrap(
+          await supabase
+            .from(table)
+            .upsert(
+              chunk.map(({ id: _id, ...rest }) => rest),
+              { onConflict: "kind,value", ignoreDuplicates: true },
+            ),
+        );
+      } else {
+        unwrap(await supabase.from(table).insert(chunk));
+      }
     }
   }
 
