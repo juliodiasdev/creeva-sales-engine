@@ -18,6 +18,7 @@ import {
   listAllMessagesRepository,
   listMessagesRepository,
   updateConversationRepository,
+  resolveDraftRepository,
   updateMessageRepository,
 } from "./agent.repository";
 
@@ -60,7 +61,7 @@ export async function getWinningExamples(
       .map(([id]) => id),
   );
 
-  const examples: string[] = [];
+  const picked: { cid: number; body: string }[] = [];
   const seen = new Set<number>();
 
   for (const m of all) {
@@ -77,10 +78,22 @@ export async function getWinningExamples(
     }
 
     seen.add(cid);
-    examples.push(m.body.slice(0, 400));
+    picked.push({ cid, body: m.body.slice(0, 400) });
   }
 
-  return examples.slice(-limit);
+  // Nunca expõe o nome de OUTRA empresa no prompt/rascunho.
+  const out: string[] = [];
+
+  for (const { cid, body } of picked.slice(-limit)) {
+    const name = (await getCompanyRepository(cid))?.name?.trim();
+    const scrubbed = name
+      ? body.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "[empresa]")
+      : body;
+
+    out.push(scrubbed);
+  }
+
+  return out;
 }
 
 function renderHistory(messages: ConversationMessage[]): string {
@@ -263,11 +276,13 @@ export async function approveDraft(
 
   const edited = text !== draft.body ? 1 : 0;
 
-  await updateMessageRepository(messageId, {
-    body: text,
+  const claimed = await resolveDraftRepository(messageId, {
     status: "SENT",
+    body: text,
     edited,
   });
+
+  if (!claimed) throw new Error("Rascunho não encontrado ou já tratado.");
 
   const prospect = await findProspectByCompanyRepository(
     Number(draft.company_id),
@@ -285,11 +300,7 @@ export async function approveDraft(
 }
 
 export async function discardDraft(messageId: number): Promise<void> {
-  const draft = await getMessageRepository(messageId);
-
-  if (!draft || draft.status !== "DRAFT") return;
-
-  await updateMessageRepository(messageId, { status: "DISCARDED" });
+  await resolveDraftRepository(messageId, { status: "DISCARDED" });
 }
 
 export async function hasConversation(companyId: number): Promise<boolean> {

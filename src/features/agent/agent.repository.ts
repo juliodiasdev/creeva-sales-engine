@@ -121,6 +121,27 @@ export async function updateMessageRepository(
   );
 }
 
+/**
+ * Troca o status SOMENTE se ainda estiver DRAFT (compare-and-set): cliques
+ * duplos ou aprovar e descartar ao mesmo tempo não se atropelam.
+ * Devolve false quando outro clique já tratou o rascunho.
+ */
+export async function resolveDraftRepository(
+  id: number,
+  fields: { status: "SENT" | "DISCARDED"; body?: string; edited?: number },
+): Promise<boolean> {
+  const rows = unwrap(
+    await getSupabase()
+      .from("conversation_messages")
+      .update(fields)
+      .eq("id", id)
+      .eq("status", "DRAFT")
+      .select("id"),
+  ) as { id: number }[];
+
+  return rows.length > 0;
+}
+
 /** Mensagens da empresa em ordem cronológica (descartadas não aparecem). */
 export async function listMessagesRepository(
   companyId: number,

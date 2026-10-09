@@ -57,6 +57,23 @@ describe("validateDraft", () => {
   });
 });
 
+describe("validateDraft: formas de burlar a regra", () => {
+  const ctx = { signalTypes: [] as string[] };
+  const msg = (message: string) => ({ message, intent: "CONTINUE", handoff_reason: null, evidence_used: [] });
+
+  it("bloqueia preço por extenso, porcentagem, site sem http e telefone", () => {
+    for (const t of ["Sai por dois mil reais", "Custa 2 mil", "Aumenta 30% das vendas", "Veja meusite.com.br", "Me chame no (65) 99999-0000", "Cerca de 500 dólares"]) {
+      expect(() => validateDraft(msg(t), ctx), t).toThrow();
+    }
+  });
+
+  it("não bloqueia conversa normal", () => {
+    for (const t of ["Trabalhamos com dados reais da sua empresa. Posso te mostrar?", "Podemos conversar amanhã às 10h?"]) {
+      expect(() => validateDraft(msg(t), ctx), t).not.toThrow();
+    }
+  });
+});
+
 describe("looksLikeOptOut", () => {
   it("detecta pedidos para parar sem marcar conversa normal", () => {
     expect(looksLikeOptOut("Por favor, pare de me mandar mensagem")).toBe(true);
@@ -67,7 +84,7 @@ describe("looksLikeOptOut", () => {
   it("separa pedido formal de parar (automático) de recusa comercial (alerta)", async () => {
     const { looksLikeHardStop, looksLikeSoftNo } = await import("../compliance/suppression.service");
 
-    for (const t of ["Pare de me mandar mensagem", "Quero me descadastrar", "Isso é spam, vou denunciar", "Não me chame mais", "me remova da lista, LGPD"]) {
+    for (const t of ["PARE", "sair", "Pare de me mandar mensagem", "Quero me descadastrar", "Chega de mensagem", "Tire meu número daí", "Isso é spam, vou denunciar", "Não me chame mais", "me remova da lista, LGPD"]) {
       expect(looksLikeHardStop(t), t).toBe(true);
     }
 
@@ -295,17 +312,35 @@ describe("supressão: caminhos paralelos", () => {
     await expect(approveDraft(out.messageId, "Olá!")).rejects.toThrow(/já tratado/);
   });
 
-  it("pedidos de parar não viram exemplo vencedor", async () => {
+  it("aprovar duas vezes ou aprovar após descartar não duplica o envio", async () => {
+    const id = (await importCompany({ name: "Clínica D", city: "Cuiabá" }, "MANUAL")).id;
+    await planCompanyWithAi(id, vi.fn().mockResolvedValue({ json: plan([]), model: "m" }));
+    await recordIncomingMessage(id, "Oi");
+    const out = await draftReply(id, {}, vi.fn().mockResolvedValue({
+      json: { message: "Olá!", intent: "CONTINUE", handoff_reason: null, evidence_used: [] },
+      model: "m",
+    }));
+
+    await Promise.allSettled([approveDraft(out.messageId, "Olá!"), approveDraft(out.messageId, "Olá!")]);
+    const sent = (await loadThread(id)).messages.filter((m) => m.status === "SENT" && m.author === "AI");
+    expect(sent).toHaveLength(1);
+
+    const { discardDraft } = await import("./agent.service");
+    await discardDraft(out.messageId); // não desfaz um envio já feito
+    expect((await loadThread(id)).messages.filter((m) => m.status === "SENT" && m.author === "AI")).toHaveLength(1);
+  });
+
+  it("pedidos de parar não viram exemplo vencedor e o nome de outra empresa é removido", async () => {
     const { getWinningExamples } = await import("./agent.service");
     const { logOutgoingMessage } = await import("./conversation.service");
     const a = (await importCompany({ name: "A1", city: "Cuiabá" }, "MANUAL")).id;
     const b = (await importCompany({ name: "B1", city: "Cuiabá" }, "MANUAL")).id;
 
-    await logOutgoingMessage(a, "Mensagem que funcionou");
+    await logOutgoingMessage(a, "Oi, aqui é da Creava! Conheci a A1 e gostei.");
     await recordIncomingMessage(a, "Gostei, me conte mais");
     await logOutgoingMessage(b, "Mensagem que irritou");
     await recordIncomingMessage(b, "Não tenho interesse");
 
-    expect(await getWinningExamples(999)).toEqual(["Mensagem que funcionou"]);
+    expect(await getWinningExamples(999)).toEqual(["Oi, aqui é da Creava! Conheci a [empresa] e gostei."]);
   });
 });

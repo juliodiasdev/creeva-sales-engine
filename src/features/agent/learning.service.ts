@@ -39,6 +39,7 @@ export async function getLearningSummary(): Promise<LearningSummary> {
     supabase
       .from("prospects")
       .select("id,company_id,status")
+      .order("id", { ascending: true })
       .range(from, to) as never,
   );
 
@@ -47,6 +48,7 @@ export async function getLearningSummary(): Promise<LearningSummary> {
       supabase
         .from("activities")
         .select("prospect_id,type")
+        .order("id", { ascending: true })
         .range(from, to) as never,
   );
 
