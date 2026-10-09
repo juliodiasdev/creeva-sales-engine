@@ -1,6 +1,7 @@
 import type { Company } from "../companies/company.types";
 
 import { createProspect } from "../prospects/prospect.service";
+import { suppressedCompanyIds } from "../compliance/suppression.service";
 import { getNumberSetting } from "../settings/settings.service";
 
 import {
@@ -198,6 +199,8 @@ export async function loadListItems(listId: number): Promise<ListItem[]> {
 export interface BulkResult {
   done: number;
   skipped: number;
+  /** Empresas ignoradas por estarem na lista de "não contatar". */
+  suppressed?: number;
 }
 
 async function pick(
@@ -252,7 +255,9 @@ export async function restoreCompanies(ids: number[]): Promise<BulkResult> {
 
 /** Passo 4: só empresas QUALIFICADAS viram prospect (com 1ª tarefa). */
 export async function startOutreach(ids: number[]): Promise<BulkResult> {
-  const { ok, skipped } = await pick(ids, ["QUALIFIED"]);
+  const { ok: qualified, skipped } = await pick(ids, ["QUALIFIED"]);
+  const blocked = await suppressedCompanyIds(qualified);
+  const ok = qualified.filter((id) => !blocked.has(id));
   let done = 0;
   let failed = 0;
 
@@ -265,7 +270,7 @@ export async function startOutreach(ids: number[]): Promise<BulkResult> {
     }
   }
 
-  return { done, skipped: skipped + failed };
+  return { done, skipped: skipped + failed, suppressed: blocked.size };
 }
 
 /** Enriquecidas com pontuação >= mínimo configurado (sugestão, não decisão). */

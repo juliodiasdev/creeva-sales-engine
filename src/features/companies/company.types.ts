@@ -35,6 +35,7 @@ export interface Company {
   reviews_count: number | null;
 
   domain: string | null;
+  dedupe_key: string | null;
   phone_normalized: string | null;
 
   lead_status: LeadStatus;

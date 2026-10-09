@@ -1,3 +1,5 @@
+import { forbiddenContent } from "../../lib/contentGuard";
+
 export interface AiAnalysisResult {
   summary: string;
   main_problem: string;
@@ -81,6 +83,10 @@ export function validateOutreach(
       `A IA citou evidência inexistente: ${invalid.join(", ")}.`,
     );
   }
+
+  const forbidden = forbiddenContent(obj.message);
+
+  if (forbidden) throw new Error(`A mensagem da IA ${forbidden}`);
 
   return {
     message: obj.message.trim().slice(0, 1500),
@@ -181,7 +187,8 @@ export function validatePlan(
       evidence.every((t) => ctx.signalTypes.includes(t)) &&
       Number.isFinite(confidence) &&
       confidence >= 0 &&
-      confidence <= 1;
+      confidence <= 1 &&
+      !forbiddenContent(`${String(b.title)} ${String(b.impact ?? "")}`);
 
     if (valid) {
       bottlenecks.push({
@@ -210,6 +217,7 @@ export function validatePlan(
       typeof a.message === "string" &&
       a.message.trim().length > 0 &&
       evidence.every((t) => ctx.signalTypes.includes(t)) &&
+      !forbiddenContent(`${String(a.angle ?? "")} ${a.message}`) &&
       (a.service_key == null ||
         ctx.serviceKeys.includes(String(a.service_key)));
 

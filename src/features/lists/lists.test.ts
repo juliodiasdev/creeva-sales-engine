@@ -97,7 +97,7 @@ describe("the controlled process: capture → enrich → qualify → outreach", 
     expect(next).toMatchObject({ step: 3, title: "Qualificar" });
 
     // abordar sem qualificar é bloqueado
-    expect(await startOutreach(ids)).toEqual({ done: 0, skipped: 3 });
+    expect(await startOutreach(ids)).toMatchObject({ done: 0, skipped: 3 });
     expect(await db.select("SELECT id FROM prospects")).toHaveLength(0);
 
     // 3. qualificar: sugestão por pontuação + decisão do usuário
@@ -114,7 +114,7 @@ describe("the controlled process: capture → enrich → qualify → outreach", 
     expect(next).toMatchObject({ step: 4, title: "Iniciar abordagem" });
 
     // 4. abordagem: vira prospect + primeira tarefa
-    expect(await startOutreach(ids)).toEqual({ done: 2, skipped: 1 });
+    expect(await startOutreach(ids)).toMatchObject({ done: 2, skipped: 1 });
     expect(await db.select("SELECT id FROM prospects")).toHaveLength(2);
     expect(await db.select("SELECT id FROM tasks WHERE type='FIRST_CONTACT'")).toHaveLength(2);
 

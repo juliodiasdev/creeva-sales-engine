@@ -5,13 +5,27 @@ import { ensureServicesSeed } from "../features/services/services.service";
 
 /** Verifica se o schema existe e prepara dados iniciais. */
 export async function initApp(): Promise<void> {
-  // "lists" e "companies.list_id" existem só a partir do schema v3 (listas):
-  // servem de marcador de versão do banco.
+  // Marcadores da versão do banco: tabelas/colunas criadas pelo schema mais novo
+  // (listas, conversas, supressão e gargalos). Se faltar algo, orienta a rodar o schema.
   const supabase = getSupabase();
-  const first = await supabase.from("lists").select("id").limit(1);
-  const { error } = first.error
-    ? first
-    : await supabase.from("companies").select("id,list_id").limit(1);
+  const probes = [
+    () => supabase.from("lists").select("id").limit(1),
+    () => supabase.from("companies").select("id,list_id").limit(1),
+    () => supabase.from("conversations").select("id").limit(1),
+    () => supabase.from("suppressions").select("id").limit(1),
+    () => supabase.from("ai_analyses").select("id,bottlenecks").limit(1),
+  ];
+
+  let error: { code?: string; message: string } | null = null;
+
+  for (const probe of probes) {
+    const result = await probe();
+
+    if (result.error) {
+      error = result.error;
+      break;
+    }
+  }
 
   if (error) {
     const missing =
