@@ -1090,3 +1090,5 @@ button.small-btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
 .chip.active { background: var(--accent, #7c5cff); border-color: var(--accent, #7c5cff); color: #111; font-weight: 700; }
 .search-go.wide { width: 100%; }
 .muted.small { font-size: 12px; margin: 0; }
+
+.sig-row { grid-template-columns: 1fr 80px; }

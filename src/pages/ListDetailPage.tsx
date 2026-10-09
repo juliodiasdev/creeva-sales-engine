@@ -19,7 +19,8 @@ import {
 import type { ListItem } from "../features/lists/lists.service";
 import { getListRepository } from "../features/lists/lists.repository";
 import type { ProspectList } from "../features/lists/lists.repository";
-import { channelOpenUrl } from "../features/contacts/channels.engine";
+import { channelOpenUrl, CHANNEL_LABEL } from "../features/contacts/channels.engine";
+import { consolidateChannels } from "../features/contacts/consolidate";
 import { openExternal } from "../lib/opener";
 
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -398,8 +399,12 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
                   <div>
                     <small>{c.phone ? formatPhone(c.phone) : "sem telefone"}</small>
                     <small>{c.website || "sem site"}</small>
-                    {i.channels.length > 0 && (
-                      <small>{i.channels.length} canal(is) de contato</small>
+                    {consolidateChannels(i.channels).main.length > 0 && (
+                      <small>
+                        {consolidateChannels(i.channels)
+                          .main.map((ch) => CHANNEL_LABEL[ch.kind])
+                          .join(" · ")}
+                      </small>
                     )}
                   </div>
 

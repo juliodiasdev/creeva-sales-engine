@@ -249,7 +249,7 @@ export function TodayPage({ onOpenProspect, onOpenList, onNavigate }: Props) {
             onClick={() => process.best.qualified && onOpenList(process.best.qualified)}>
             <strong>{process.qualified}</strong><span>Para abordar</span>
           </button>
-          <button type="button" className="step" onClick={() => onNavigate("pipeline")}>
+          <button type="button" className="step" disabled>
             <strong>{process.ready}</strong><span>Em abordagem</span>
           </button>
         </div>

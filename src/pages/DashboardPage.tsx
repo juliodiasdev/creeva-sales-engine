@@ -1,23 +1,26 @@
 import { useEffect, useState } from "react";
 
-import { getDashboardMetrics } from "../features/dashboard/dashboard.service";
-import type { DashboardMetrics } from "../features/dashboard/dashboard.service";
+import { getAnalysisSummary, getDashboardMetrics } from "../features/dashboard/dashboard.service";
+import type { AnalysisSummary, DashboardMetrics } from "../features/dashboard/dashboard.service";
 import { loadListsWithStats } from "../features/lists/lists.service";
 import type { ListWithStats } from "../features/lists/lists.service";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { errorMessage, formatCurrency } from "../lib/format";
+import { SIGNAL_LABEL } from "../lib/labels";
 
 const pct = (v: number) => `${(v * 100).toFixed(1).replace(".", ",")}%`;
 
 export function DashboardPage() {
   const [m, setM] = useState<DashboardMetrics | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisSummary | null>(null);
   const [lists, setLists] = useState<ListWithStats[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([getDashboardMetrics(), loadListsWithStats()])
-      .then(([metrics, l]) => {
+    Promise.all([getDashboardMetrics(), loadListsWithStats(), getAnalysisSummary()])
+      .then(([metrics, l, a]) => {
+        setAnalysis(a);
         setM(metrics);
         setLists(l);
       })
@@ -62,6 +65,57 @@ export function DashboardPage() {
           <Card label="Taxa de fechamento" value={pct(m.closeRate)} hint={`${m.lost} perdido(s)`} />
         </div>
       </section>
+
+      {analysis && analysis.total > 0 && (
+        <section className="panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">ANÁLISE DAS EMPRESAS</span>
+              <h2>Funil de oportunidades</h2>
+            </div>
+          </div>
+
+          <div className="funnel">
+            {[
+              ["Captadas do Google Maps", analysis.total],
+              ["Analisadas (enriquecidas)", analysis.analyzed],
+              [`Alta oportunidade (pontuação ≥ ${analysis.minScore})`, analysis.highOpportunity],
+              ["Abaixo da pontuação mínima", analysis.belowMinimum],
+            ].map(([label, n], i, all) => (
+              <div className="funnel-row" key={String(label)}>
+                <span>{label}</span>
+                <div className="funnel-bar">
+                  <div style={{ width: `${(Number(n) / Math.max(1, analysis.total)) * 100}%` }} />
+                </div>
+                <strong>{n}</strong>
+                <em>
+                  {i === 0 ? "—" : pct(Number(n) / Math.max(1, Number(all[i === 3 ? 1 : i - 1][1])))}
+                </em>
+              </div>
+            ))}
+          </div>
+
+          {analysis.analyzed < analysis.total && (
+            <p className="muted small">
+              {analysis.total - analysis.analyzed} empresa(s) ainda não foram analisadas: abra a lista e use "Enriquecer".
+            </p>
+          )}
+
+          {analysis.signals.length > 0 && (
+            <>
+              <h3 className="group-title">O que a análise encontrou (empresas por oportunidade)</h3>
+              <div className="perf-table">
+                {analysis.signals.map((sg) => (
+                  <div className="perf-row sig-row" key={sg.type}>
+                    <span>{SIGNAL_LABEL[sg.type] ?? sg.type}</span>
+                    <strong>{sg.companies}</strong>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       <section className="panel">
         <div className="panel-title">

@@ -9,10 +9,6 @@ export type PageId =
   | "prospect"
   | "lists"
   | "companies"
-  | "contacts"
-  | "pipeline"
-  | "session"
-  | "playbook"
   | "settings";
 
 const ICONS: Record<PageId, ReactNode> = {
@@ -47,31 +43,6 @@ const ICONS: Record<PageId, ReactNode> = {
       <path d="M14 9h6v12h-6M8 7h2M8 11h2M8 15h2" />
     </>
   ),
-  contacts: (
-    <>
-      <path d="M4 5h16v14H4z" />
-      <path d="M8 10h8M8 14h5" />
-    </>
-  ),
-  pipeline: (
-    <>
-      <rect x="3" y="4" width="5" height="16" />
-      <rect x="10" y="4" width="5" height="10" />
-      <rect x="17" y="4" width="4" height="13" />
-    </>
-  ),
-  session: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m10 8.5 5.5 3.5-5.5 3.5z" />
-    </>
-  ),
-  playbook: (
-    <>
-      <path d="M4 4h10a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z" />
-      <path d="M8 8h6" />
-    </>
-  ),
   settings: (
     <>
       <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
@@ -93,12 +64,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "today", label: "Hoje", section: "INÍCIO", description: "Seu processo e as tarefas do dia: o que fazer agora para gerar clientes." },
   { id: "prospect", label: "Prospectar", section: "PROCESSO", description: "Busque empresas no Google Maps por nicho, estado e cidade: cada busca gera uma lista." },
   { id: "lists", label: "Listas", section: "PROCESSO", description: "Cada prospecção vira uma lista: enriqueça, qualifique e inicie a abordagem." },
-  { id: "session", label: "Abordar agora", section: "PROCESSO", description: "Uma empresa por vez: copie, envie e passe para a próxima." },
-  { id: "pipeline", label: "Funil de vendas", section: "PROCESSO", description: "Acompanhe cada empresa do primeiro contato até o fechamento." },
-  { id: "companies", label: "Base geral", section: "BASE", description: "Todas as empresas cadastradas, com organização de duplicados." },
-  { id: "contacts", label: "Contatos", section: "BASE", description: "WhatsApp, redes sociais e e-mail de cada empresa, com exportação para planilha." },
+  { id: "companies", label: "Base geral", section: "BASE", description: "Todas as empresas e contatos coletados, sem duplicados, com exportação para planilha." },
   { id: "dashboard", label: "Resultados", section: "ANÁLISE", description: "Números reais: respostas, reuniões, propostas e receita." },
-  { id: "playbook", label: "Mensagens prontas", section: "CONFIGURAÇÃO", description: "Modelos de mensagem por segmento e etapa." },
   { id: "settings", label: "Configurações", section: "CONFIGURAÇÃO", description: "Serviços, integrações, backup e preferências." },
 ];
 

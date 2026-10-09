@@ -18,17 +18,13 @@ import type {
 
 
 import { TodayPage } from "./pages/TodayPage";
-import { CompaniesPage } from "./pages/CompaniesPage";
-import { ContactsPage } from "./pages/ContactsPage";
+import { BasePage } from "./pages/BasePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ListsPage } from "./pages/ListsPage";
 import { ProspectPage } from "./pages/ProspectPage";
 import { ListDetailPage } from "./pages/ListDetailPage";
-import { PlaybookPage } from "./pages/PlaybookPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { SessionPage } from "./pages/SessionPage";
 import { CompanyDetailPage } from "./pages/CompanyDetailPage";
-import { PipelinePage } from "./pages/PipelinePage";
 import { ProspectDetailPage } from "./pages/ProspectDetailPage";
 
 import { errorMessage } from "./lib/format";
@@ -58,15 +54,7 @@ function renderPage(
     case "lists":
       return <ListsPage onOpenList={openList} onNewSearch={() => navigate("prospect")} />;
     case "companies":
-      return <CompaniesPage onOpenCompany={openCompany} />;
-    case "contacts":
-      return <ContactsPage onOpenCompany={openCompany} />;
-    case "pipeline":
-      return <PipelinePage onOpenProspect={openProspect} />;
-    case "session":
-      return <SessionPage onOpenProspect={openProspect} />;
-    case "playbook":
-      return <PlaybookPage />;
+      return <BasePage onOpenCompany={openCompany} />;
     case "settings":
       return <SettingsPage />;
   }

@@ -1,23 +1,11 @@
 import { useState } from "react";
 
 import { CHANNEL_LABEL, channelOpenUrl } from "./channels.engine";
-import type { ChannelKind } from "./channels.engine";
 import type { StoredChannel } from "./channels.repository";
 
+import { consolidateChannels } from "./consolidate";
 import { openExternal } from "../../lib/opener";
 import { formatPhone } from "../../lib/format";
-
-const ORDER: ChannelKind[] = [
-  "WHATSAPP",
-  "INSTAGRAM",
-  "FACEBOOK",
-  "LINKEDIN",
-  "EMAIL",
-  "PHONE",
-  "YOUTUBE",
-  "TIKTOK",
-  "WEBSITE",
-];
 
 /** Um botão por canal: abre no app certo (WhatsApp, rede social, e-mail...). */
 export function ChannelButtons({
@@ -38,9 +26,7 @@ export function ChannelButtons({
     return <span className="muted">Sem canais de contato</span>;
   }
 
-  const sorted = [...channels].sort(
-    (a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind),
-  );
+  const sorted = consolidateChannels(channels).main;
 
   return (
     <span className="channel-buttons">

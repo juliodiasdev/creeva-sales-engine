@@ -25,6 +25,7 @@ import type { StoredAnalysis } from "../features/ai/ai.service";
 import { label, LEAD_STATUS_LABEL, SCORE_DIMENSION_LABEL, SIGNAL_LABEL, SOURCE_LABEL, humanizeReason } from "../lib/labels";
 import { createProspect } from "../features/prospects/prospect.service";
 
+import { consolidateChannels } from "../features/contacts/consolidate";
 import { ChannelButtons } from "../features/contacts/ChannelButtons";
 import { listChannelsRepository } from "../features/contacts/channels.repository";
 import type { StoredChannel } from "../features/contacts/channels.repository";
@@ -240,7 +241,7 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Contatos ({channels.length})</h2>
+          <h2>Contatos</h2>
         </div>
 
         <ChannelButtons
@@ -252,18 +253,33 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
           subject={`Contato — ${company.name}`}
         />
 
-        {channels.length > 0 && (
-          <ul className="reasons">
-            {channels.map((ch) => (
-              <li key={ch.id}>
-                <strong>{CHANNEL_LABEL[ch.kind]}</strong> — {ch.kind === "PHONE" || ch.kind === "WHATSAPP" ? formatPhone(ch.value) : ch.value}{" "}
-                <small>
-                  ({ch.label ? `${ch.label}; ` : ""}fonte: {label(SOURCE_LABEL, ch.source)})
-                </small>
-              </li>
-            ))}
-          </ul>
-        )}
+        {channels.length > 0 && (() => {
+          const { main, extra } = consolidateChannels(channels);
+          const line = (ch: StoredChannel) => (
+            <li key={ch.id}>
+              <strong>{CHANNEL_LABEL[ch.kind]}</strong> —{" "}
+              {ch.kind === "PHONE" || ch.kind === "WHATSAPP" ? formatPhone(ch.value) : ch.value}{" "}
+              <small>
+                ({ch.label ? `${ch.label}; ` : ""}fonte: {label(SOURCE_LABEL, ch.source)})
+              </small>
+            </li>
+          );
+
+          return (
+            <>
+              <ul className="reasons">{main.map(line)}</ul>
+
+              {extra.length > 0 && (
+                <details>
+                  <summary className="muted">
+                    Outros contatos encontrados ({extra.length})
+                  </summary>
+                  <ul className="reasons">{extra.map(line)}</ul>
+                </details>
+              )}
+            </>
+          );
+        })()}
 
         {channels.length === 0 && (
           <p className="muted">
