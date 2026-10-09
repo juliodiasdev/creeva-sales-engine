@@ -105,6 +105,8 @@ export interface DiscoveryOptions {
   neighborhood?: string;
   /** UF (ex.: "MT"): evita confundir cidades de mesmo nome. */
   state?: string;
+  /** Nome da lista; se vazio, usa "Nicho — Cidade · data". */
+  listName?: string;
   /** 1 a 3 páginas de resultados (20 por página). */
   pages?: number;
 }
@@ -150,7 +152,7 @@ export function startDiscovery(
     const places = await searchPlaces(query, pages);
 
     const listId = await createListRepository({
-      name: buildListName(seg, where, area),
+      name: options.listName?.trim() || buildListName(seg, where, area),
       segment: seg,
       city: cty,
       neighborhood: area,
