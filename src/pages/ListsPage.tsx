@@ -35,13 +35,16 @@ const SUGGESTIONS = [
 
 const STATES = listarEstados();
 
+/** Máximo do Google Maps: 3 páginas de 20 resultados. */
+const MAX_PAGES = 3;
+
 export function ListsPage({ onOpenList }: Props) {
   const [segment, setSegment] = useState("");
   const [uf, setUf] = useState(() => storedPlace("uf"));
   const [city, setCity] = useState(() => storedPlace("city"));
   const [api, setApi] = useState<ApiMunicipios | null>(null);
   const [neighborhood, setNeighborhood] = useState("");
-  const [pages, setPages] = useState(1);
+  const pages = MAX_PAGES;
   const [previous, setPrevious] = useState<SearchRecord | null>(null);
   const [lists, setLists] = useState<ListWithStats[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -231,23 +234,16 @@ export function ListsPage({ onOpenList }: Props) {
             </div>
           </div>
 
-          <div className="search-step">
-            <span className="step-num">3</span>
-            <div className="step-fields">
-              <label>
-                Quantidade de empresas
-                <select value={pages} onChange={(e) => setPages(Number(e.target.value))}>
-                  <option value={1}>até 20 empresas</option>
-                  <option value={2}>até 40 empresas</option>
-                  <option value={3}>até 60 empresas</option>
-                </select>
-              </label>
+          <button type="submit" className="search-go wide" disabled={!canSearch}>
+            {searching
+              ? `Buscando no Google Maps… ${searching.progress}%`
+              : "Gerar leads em uma lista"}
+          </button>
 
-              <button type="submit" className="search-go" disabled={!canSearch}>
-                {searching ? "Buscando…" : "Gerar leads em uma lista"}
-              </button>
-            </div>
-          </div>
+          <p className="muted small">
+            Traz até 60 empresas por busca (limite do Google Maps). Para achar mais, repita
+            com outro bairro: lugares já coletados nunca voltam.
+          </p>
         </form>
 
         {previous && (

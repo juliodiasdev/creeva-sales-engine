@@ -1076,3 +1076,5 @@ button.small-btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
 .chip { padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
 .chip:hover { color: inherit; border-color: var(--accent, #7c5cff); }
 .chip.active { background: var(--accent, #7c5cff); border-color: var(--accent, #7c5cff); color: #111; font-weight: 700; }
+.search-go.wide { width: 100%; }
+.muted.small { font-size: 12px; margin: 0; }
