@@ -5,11 +5,13 @@ import { ensureServicesSeed } from "../features/services/services.service";
 
 /** Verifica se o schema existe e prepara dados iniciais. */
 export async function initApp(): Promise<void> {
-  // "services" existe só a partir do schema v2: serve de marcador de versão.
-  const { error } = await getSupabase()
-    .from("services")
-    .select("id")
-    .limit(1);
+  // "lists" e "companies.list_id" existem só a partir do schema v3 (listas):
+  // servem de marcador de versão do banco.
+  const supabase = getSupabase();
+  const first = await supabase.from("lists").select("id").limit(1);
+  const { error } = first.error
+    ? first
+    : await supabase.from("companies").select("id,list_id").limit(1);
 
   if (error) {
     const missing =
