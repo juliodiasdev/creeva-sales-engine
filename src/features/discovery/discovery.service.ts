@@ -103,6 +103,8 @@ export async function importPlaces(
 
 export interface DiscoveryOptions {
   neighborhood?: string;
+  /** UF (ex.: "MT"): evita confundir cidades de mesmo nome. */
+  state?: string;
   /** 1 a 3 páginas de resultados (20 por página). */
   pages?: number;
 }
@@ -140,13 +142,15 @@ export function startDiscovery(
     throw new Error("Informe segmento e cidade.");
   }
 
-  const query = area ? `${seg} em ${area}, ${cty}` : `${seg} em ${cty}`;
+  const uf = options.state?.trim().toUpperCase() || undefined;
+  const where = uf ? `${cty} - ${uf}` : cty;
+  const query = area ? `${seg} em ${area}, ${where}` : `${seg} em ${where}`;
 
   return startJob("DISCOVERY", async (report) => {
     const places = await searchPlaces(query, pages);
 
     const listId = await createListRepository({
-      name: buildListName(seg, cty, area),
+      name: buildListName(seg, where, area),
       segment: seg,
       city: cty,
       neighborhood: area,
