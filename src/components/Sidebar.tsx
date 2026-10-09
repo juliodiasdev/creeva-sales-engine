@@ -6,10 +6,9 @@ import logo from "../assets/creava-logo.png";
 export type PageId =
   | "today"
   | "dashboard"
-  | "discovery"
+  | "lists"
   | "companies"
   | "contacts"
-  | "prospects"
   | "pipeline"
   | "session"
   | "playbook"
@@ -30,10 +29,9 @@ const ICONS: Record<PageId, ReactNode> = {
       <rect x="3" y="16" width="7" height="5" />
     </>
   ),
-  discovery: (
+  lists: (
     <>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-4-4" />
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
     </>
   ),
   companies: (
@@ -46,12 +44,6 @@ const ICONS: Record<PageId, ReactNode> = {
     <>
       <path d="M4 5h16v14H4z" />
       <path d="M8 10h8M8 14h5" />
-    </>
-  ),
-  prospects: (
-    <>
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20c0-2.5-1.5-4.5-4-5.5" />
     </>
   ),
   pipeline: (
@@ -91,13 +83,12 @@ export interface NavItem {
 
 /** Ordem = atalhos Ctrl+1…Ctrl+0. Agrupado como nos grandes CRMs. */
 export const NAV_ITEMS: NavItem[] = [
-  { id: "today", label: "Hoje", section: "VENDAS", description: "Suas tarefas do dia: o que fazer agora para gerar clientes." },
-  { id: "session", label: "Prospectar agora", section: "VENDAS", description: "Uma empresa por vez: copie, envie e passe para a próxima." },
-  { id: "pipeline", label: "Funil de vendas", section: "VENDAS", description: "Acompanhe cada empresa do primeiro contato até o fechamento." },
-  { id: "prospects", label: "Em prospecção", section: "VENDAS", description: "Empresas que você já decidiu trabalhar." },
-  { id: "discovery", label: "Buscar empresas", section: "BASE DE CONTATOS", description: "Encontre novas empresas no Google, sem repetir as que você já coletou." },
-  { id: "companies", label: "Empresas", section: "BASE DE CONTATOS", description: "Todas as empresas cadastradas, com organização de duplicados." },
-  { id: "contacts", label: "Contatos", section: "BASE DE CONTATOS", description: "WhatsApp, redes sociais e e-mail de cada empresa, com exportação para planilha." },
+  { id: "today", label: "Hoje", section: "INÍCIO", description: "Seu processo e as tarefas do dia: o que fazer agora para gerar clientes." },
+  { id: "lists", label: "Listas", section: "PROCESSO", description: "Prospecte no Google Maps, enriqueça, qualifique e inicie a abordagem lista por lista." },
+  { id: "session", label: "Prospectar agora", section: "PROCESSO", description: "Uma empresa por vez: copie, envie e passe para a próxima." },
+  { id: "pipeline", label: "Funil de vendas", section: "PROCESSO", description: "Acompanhe cada empresa do primeiro contato até o fechamento." },
+  { id: "companies", label: "Base geral", section: "BASE", description: "Todas as empresas cadastradas, com organização de duplicados." },
+  { id: "contacts", label: "Contatos", section: "BASE", description: "WhatsApp, redes sociais e e-mail de cada empresa, com exportação para planilha." },
   { id: "dashboard", label: "Resultados", section: "ANÁLISE", description: "Números reais: respostas, reuniões, propostas e receita." },
   { id: "playbook", label: "Mensagens prontas", section: "CONFIGURAÇÃO", description: "Modelos de mensagem por segmento e etapa." },
   { id: "settings", label: "Configurações", section: "CONFIGURAÇÃO", description: "Serviços, integrações, backup e preferências." },

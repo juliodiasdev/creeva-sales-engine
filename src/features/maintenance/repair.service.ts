@@ -7,6 +7,12 @@ import {
 
 import { getSetting, setSetting } from "../settings/settings.service";
 
+import {
+  assignCompaniesToListRepository,
+  createListRepository,
+  updateListRepository,
+} from "../lists/lists.repository";
+
 const GENERIC_DOMAINS = [
   "instagram.com", "facebook.com", "fb.com", "fb.me", "linkedin.com",
   "youtube.com", "youtu.be", "tiktok.com", "twitter.com", "x.com", "wa.me",
@@ -120,13 +126,67 @@ export async function repairLegacyData(): Promise<RepairReport> {
   return report;
 }
 
-/** Executa os reparos uma única vez (marcador em settings). */
+/**
+ * Empresas captadas antes das listas existirem passam a morar em listas
+ * ("Segmento — Cidade (anteriores)"), uma por segmento+cidade.
+ */
+export async function groupLegacyCompaniesIntoLists(): Promise<number> {
+  const supabase = getSupabase();
+
+  const orphans = await fetchAllPages<{
+    id: number;
+    segment: string | null;
+    city: string | null;
+  }>((from, to) =>
+    supabase
+      .from("companies")
+      .select("id,segment,city")
+      .is("list_id", null)
+      .order("id", { ascending: true })
+      .range(from, to) as never,
+  );
+
+  const groups = new Map<string, number[]>();
+
+  for (const c of orphans) {
+    const key = `${c.segment?.trim() || "Sem segmento"}|${c.city?.trim() || "Sem cidade"}`;
+    groups.set(key, [...(groups.get(key) ?? []), Number(c.id)]);
+  }
+
+  for (const [key, ids] of groups) {
+    const [segment, city] = key.split("|");
+    const cap = segment.charAt(0).toUpperCase() + segment.slice(1);
+
+    const listId = await createListRepository({
+      name: `${cap} — ${city} (anteriores)`,
+      segment,
+      city,
+      queryText: "Importada antes do recurso de listas",
+      pages: 1,
+    });
+
+    await assignCompaniesToListRepository(ids, listId);
+    await updateListRepository(listId, { found: ids.length, imported: ids.length });
+  }
+
+  return groups.size;
+}
+
+/** Executa os reparos pendentes uma única vez cada (marcador em settings). */
 export async function runRepairsOnce(): Promise<RepairReport | null> {
-  if ((await getSetting("data_repairs")) === "v1") return null;
+  const done = await getSetting("data_repairs");
 
-  const report = await repairLegacyData();
+  if (done === "v2") return null;
 
-  await setSetting("data_repairs", "v1");
+  let report: RepairReport | null = null;
 
-  return report;
+  if (done !== "v1") {
+    report = await repairLegacyData();
+    await setSetting("data_repairs", "v1");
+  }
+
+  await groupLegacyCompaniesIntoLists();
+  await setSetting("data_repairs", "v2");
+
+  return report ?? { domainsCleared: 0, ledgerReleased: 0, junkChannelsRemoved: 0 };
 }

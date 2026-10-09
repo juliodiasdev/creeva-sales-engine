@@ -35,6 +35,9 @@ import {
 import { label, TASK_TYPE_LABEL, PRIORITY_LABEL } from "../lib/labels";
 import { STATUS_LABEL } from "../features/prospects/prospect.labels";
 import type { ProspectStatus } from "../features/prospects/prospect.types";
+import { getProcessOverview } from "../features/lists/lists.service";
+import type { ProcessOverview } from "../features/lists/lists.service";
+import type { PageId } from "../components/Sidebar";
 import { ErrorMessage } from "../components/ErrorMessage";
 
 function messageOf(
@@ -48,9 +51,17 @@ function messageOf(
 
 interface Props {
   onOpenProspect: (id: number) => void;
+  onOpenList: (id: number) => void;
+  onNavigate: (page: PageId) => void;
 }
 
-export function TodayPage({ onOpenProspect }: Props) {
+export function TodayPage({ onOpenProspect, onOpenList, onNavigate }: Props) {
+  const [process, setProcess] = useState<ProcessOverview | null>(null);
+
+  useEffect(() => {
+    void getProcessOverview().then(setProcess).catch(() => setProcess(null));
+  }, []);
+
   const [tasks, setTasks] = useState<
     TaskWithProspect[]
   >([]);
@@ -216,6 +227,40 @@ export function TodayPage({ onOpenProspect }: Props) {
 
   return (
     <>
+    <section className="panel">
+      <div className="panel-title">
+        <div>
+          <span className="eyebrow">SEU PROCESSO</span>
+          <h2>De lista a cliente</h2>
+        </div>
+      </div>
+
+      {process && process.openLists > 0 ? (
+        <div className="stepper">
+          <button type="button" className="step" disabled={!process.best.discovered}
+            onClick={() => process.best.discovered && onOpenList(process.best.discovered)}>
+            <strong>{process.discovered}</strong><span>Para enriquecer</span>
+          </button>
+          <button type="button" className="step" disabled={!process.best.enriched}
+            onClick={() => process.best.enriched && onOpenList(process.best.enriched)}>
+            <strong>{process.enriched}</strong><span>Para qualificar</span>
+          </button>
+          <button type="button" className="step" disabled={!process.best.qualified}
+            onClick={() => process.best.qualified && onOpenList(process.best.qualified)}>
+            <strong>{process.qualified}</strong><span>Para abordar</span>
+          </button>
+          <button type="button" className="step" onClick={() => onNavigate("pipeline")}>
+            <strong>{process.ready}</strong><span>Em abordagem</span>
+          </button>
+        </div>
+      ) : (
+        <div className="empty">
+          Comece criando uma lista: busque empresas no Google Maps, enriqueça e qualifique.
+          <div><button type="button" onClick={() => onNavigate("lists")}>Criar primeira lista</button></div>
+        </div>
+      )}
+    </section>
+
     <section className="metrics">
       <article className="metric-card">
         <span>Atrasadas</span>

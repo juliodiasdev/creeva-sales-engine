@@ -11,9 +11,10 @@ export const TASK_TYPE_LABEL: Record<string, string> = {
 
 export const LEAD_STATUS_LABEL: Record<string, string> = {
   DISCOVERED: "Nova",
-  ENRICHING: "Em análise",
+  ENRICHING: "Enriquecendo…",
+  ENRICHED: "Enriquecida",
   QUALIFIED: "Qualificada",
-  READY: "Em prospecção",
+  READY: "Em abordagem",
   DISQUALIFIED: "Descartada",
 };
 

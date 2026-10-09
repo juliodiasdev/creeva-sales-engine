@@ -96,7 +96,7 @@ describe("enrichment pipeline", () => {
     db = await createMigratedTestDb();
   });
 
-  it("qualifies a weak-site company, stores snapshot/signals/score, syncs prospect", async () => {
+  it("enriches (never qualifies by itself), stores snapshot/signals/score, syncs prospect", async () => {
     await setSetting("min_score", "30");
     const { id } = await importCompany(
       { name: "Clínica B", segment: "Odontologia", city: "Cuiabá", website: "http://b.com", phone: "(65) 3333-2222", reviews_count: 80, rating: 4.5 } as never,
@@ -104,7 +104,7 @@ describe("enrichment pipeline", () => {
     );
     const crawler = async (u: string) => extractWebsiteFacts(HTML_BAD, { url: u, finalUrl: u, httpStatus: 200 });
     const out = await enrichCompany(id, crawler);
-    expect(out.status).toBe("QUALIFIED");
+    expect(out.status).toBe("ENRICHED"); // quem qualifica é o usuário
 
     const [{ n: sig }] = await db.select<{ n: number }[]>("SELECT COUNT(*) n FROM signals WHERE company_id=$1", [id]);
     expect(sig).toBeGreaterThan(3);

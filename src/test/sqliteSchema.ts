@@ -304,6 +304,33 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 5,
+    name: "lists",
+    statements: [
+      `CREATE TABLE lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        segment TEXT,
+        city TEXT,
+        neighborhood TEXT,
+        query_text TEXT,
+        pages INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        found INTEGER NOT NULL DEFAULT 0,
+        imported INTEGER NOT NULL DEFAULT 0,
+        duplicates INTEGER NOT NULL DEFAULT 0,
+        already_seen INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`,
+      `ALTER TABLE companies ADD COLUMN list_id INTEGER REFERENCES lists(id) ON DELETE SET NULL`,
+      `ALTER TABLE companies ADD COLUMN maps_url TEXT`,
+      `ALTER TABLE companies ADD COLUMN business_status TEXT`,
+      `CREATE INDEX idx_companies_list ON companies(list_id)`,
+    ],
+  },
 ];
 
 export async function runMigrations(

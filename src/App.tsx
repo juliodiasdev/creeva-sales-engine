@@ -20,9 +20,9 @@ import type {
 import { TodayPage } from "./pages/TodayPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
 import { ContactsPage } from "./pages/ContactsPage";
-import { ProspectsPage } from "./pages/ProspectsPage";
 import { DashboardPage } from "./pages/DashboardPage";
-import { DiscoveryPage } from "./pages/DiscoveryPage";
+import { ListsPage } from "./pages/ListsPage";
+import { ListDetailPage } from "./pages/ListDetailPage";
 import { PlaybookPage } from "./pages/PlaybookPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SessionPage } from "./pages/SessionPage";
@@ -42,22 +42,22 @@ import { SetupPage } from "./pages/SetupPage";
 
 function renderPage(
   page: PageId,
+  navigate: (page: PageId) => void,
   openProspect: (id: number) => void,
   openCompany: (id: number) => void,
+  openList: (id: number) => void,
 ) {
   switch (page) {
     case "today":
-      return <TodayPage onOpenProspect={openProspect} />;
+      return <TodayPage onOpenProspect={openProspect} onOpenList={openList} onNavigate={navigate} />;
     case "dashboard":
       return <DashboardPage />;
-    case "discovery":
-      return <DiscoveryPage />;
+    case "lists":
+      return <ListsPage onOpenList={openList} />;
     case "companies":
       return <CompaniesPage onOpenCompany={openCompany} />;
     case "contacts":
       return <ContactsPage onOpenCompany={openCompany} />;
-    case "prospects":
-      return <ProspectsPage onOpenProspect={openProspect} />;
     case "pipeline":
       return <PipelinePage onOpenProspect={openProspect} />;
     case "session":
@@ -77,6 +77,9 @@ function App() {
     useState<number | null>(null);
 
   const [companyId, setCompanyId] =
+    useState<number | null>(null);
+
+  const [listId, setListId] =
     useState<number | null>(null);
 
   const [collapsed, setCollapsed] = useState(() => {
@@ -109,7 +112,15 @@ function App() {
   function navigate(next: PageId) {
     setProspectId(null);
     setCompanyId(null);
+    setListId(null);
     setPage(next);
+  }
+
+  function openList(id: number) {
+    setProspectId(null);
+    setCompanyId(null);
+    setPage("lists");
+    setListId(id);
   }
 
   // Atalhos de teclado: Ctrl+1..9 navega, Ctrl+B recolhe o menu, Esc volta.
@@ -245,7 +256,9 @@ function App() {
       ? "Empresa"
       : prospectId !== null
         ? "Prospect"
-        : null;
+        : listId !== null
+          ? "Lista"
+          : null;
 
   return (
     <div className={collapsed ? "shell collapsed" : "shell"}>
@@ -279,13 +292,13 @@ function App() {
             }}
           />
 
-          {page !== "discovery" && (
+          {(page !== "lists" || listId !== null) && (
             <button
               type="button"
               className="topbar-cta"
-              onClick={() => navigate("discovery")}
+              onClick={() => navigate("lists")}
             >
-              + Buscar empresas
+              + Nova lista
             </button>
           )}
         </header>
@@ -307,8 +320,15 @@ function App() {
               prospectId={prospectId}
               onBack={() => setProspectId(null)}
             />
+          ) : listId !== null ? (
+            <ListDetailPage
+              key={listId}
+              listId={listId}
+              onBack={() => setListId(null)}
+              onOpenCompany={setCompanyId}
+            />
           ) : (
-            renderPage(page, setProspectId, setCompanyId)
+            renderPage(page, navigate, setProspectId, setCompanyId, openList)
           )}
         </main>
 

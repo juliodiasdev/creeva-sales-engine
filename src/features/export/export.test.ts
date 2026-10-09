@@ -27,11 +27,11 @@ const ch = (company_id: number, kind: string, value: string, url: string | null 
 
 const input = () => ({
   companies: [
-    company(1, "Dentista em Cuiabá MT | Myrelief | Clínica Odontológica", { lead_status: "ENRICHING" }),
+    company(1, "Dentista em Cuiabá MT | Myrelief | Clínica Odontológica", { lead_status: "ENRICHED" }),
     company(1, "repetida"),
     company(2, "Odonto Alfa", { lead_status: "READY" }),
     company(3, "Print Car Estética Automotiva", { lead_status: "DISCOVERED", segment: "estética automotiva", rating: null, reviews_count: null }),
-    company(4, "Só Instagram", { lead_status: "ENRICHING" }),
+    company(4, "Só Instagram", { lead_status: "ENRICHED" }),
   ],
   channels: [
     ch(1, "PHONE", "6530282263", "tel:+556530282263"),
@@ -72,8 +72,8 @@ describe("buildExportData", () => {
   });
 
   it("portuguese statuses, contact flags and what is missing", () => {
-    expect(by("Myrelief")).toMatchObject({ leadStatus: "Em análise", hasContact: true });
-    expect(by("Odonto Alfa")).toMatchObject({ leadStatus: "Em prospecção", prospectStatus: "Contatado", service: "Suporte contínuo" });
+    expect(by("Myrelief")).toMatchObject({ leadStatus: "Enriquecida", hasContact: true });
+    expect(by("Odonto Alfa")).toMatchObject({ leadStatus: "Em abordagem", prospectStatus: "Contatado", service: "Suporte contínuo" });
     expect(by("Print Car Estética Automotiva")).toMatchObject({ hasContact: false, leadStatus: "Nova" });
     expect(by("Print Car Estética Automotiva").missing).toContain("Enriquecer");
     expect(by("Só Instagram").hasContact).toBe(true);

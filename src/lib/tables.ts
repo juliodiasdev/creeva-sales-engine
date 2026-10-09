@@ -3,7 +3,8 @@
  * supabase/schema.sql (há um teste que garante isso).
  */
 export const TABLE_COLUMNS: Record<string, string[]> = {
-  companies: ["id","name","segment","city","state","website","phone","instagram","google_place_id","cnpj","legal_name","cnae","company_size","registration_status","opened_at","capital","address","category","rating","reviews_count","domain","phone_normalized","dedupe_key","lead_status","disqualified_reason","created_at","updated_at"],
+  lists: ["id","name","segment","city","neighborhood","query_text","pages","status","found","imported","duplicates","already_seen","notes","created_at","updated_at"],
+  companies: ["id","name","segment","city","state","website","phone","instagram","google_place_id","cnpj","legal_name","cnae","company_size","registration_status","opened_at","capital","address","category","rating","reviews_count","domain","phone_normalized","dedupe_key","lead_status","disqualified_reason","list_id","maps_url","business_status","created_at","updated_at"],
   company_sources: ["id","company_id","source_type","source_id","raw_data","created_at"],
   website_snapshots: ["id","company_id","url","facts","fetched_at"],
   signals: ["id","company_id","type","value","evidence","source","confidence","created_at"],
@@ -28,6 +29,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
 
 /** Ordem pai -> filho (inserção). A remoção usa a ordem inversa. */
 export const TABLE_ORDER = [
+  "lists",
   "companies",
   "company_sources",
   "company_channels",
