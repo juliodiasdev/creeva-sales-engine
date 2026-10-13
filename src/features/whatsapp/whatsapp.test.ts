@@ -28,9 +28,13 @@ import { isCompanySuppressed } from "../compliance/suppression.service";
 import { getSupabase } from "../../lib/supabase";
 import { phoneVariants } from "./phone";
 import {
+  countFailedMessages,
+  dismissDeliveryFailure,
   dismissUnknownMessage,
   findCompanyByPhone,
+  listDeliveryFailures,
   listUnknownMessages,
+  retryFailedMessages,
   serviceWindowOpen,
   syncWhatsAppInbox,
 } from "./inbox.service";
@@ -106,12 +110,57 @@ describe("caixa de entrada do WhatsApp", () => {
 
   it("não reprocessa o que outra execução já reivindicou", async () => {
     const id = (await importCompany({ name: "Clínica Corrida", city: "Cuiabá", phone: "(65) 99333-4444" }, "MANUAL")).id;
+    await createProspect(id);
     await event("w4", "5565993334444", "Olá");
 
     const [a, b] = await Promise.all([syncWhatsAppInbox(), syncWhatsAppInbox()]);
 
-    expect(a.imported + b.imported).toBe(1);
+    expect(a).toEqual(b); // a segunda chamada aproveita a mesma execução
+    expect(a.imported).toBe(1);
     expect((await loadThread(id)).messages).toHaveLength(1);
+  });
+});
+
+describe("caixa de entrada: casos de borda", () => {
+  it("pedido de parar de um número sem empresa suprime o telefone mesmo assim", async () => {
+    await event("wx1", "5511988887777", "Pare de me mandar mensagem");
+    await syncWhatsAppInbox();
+
+    const outro = (await importCompany({ name: "Chegou Depois", city: "SP", phone: "(11) 98888-7777" }, "MANUAL")).id;
+    expect(await isCompanySuppressed(outro)).toBe(true);
+  });
+
+  it("empresa que ainda não está em abordagem fica na lista de fora da abordagem, com o nome", async () => {
+    const id = (await importCompany({ name: "Sem Abordagem", city: "Cuiabá", phone: "(65) 99555-6666" }, "MANUAL")).id;
+    await event("wx2", "5565995556666", "Vi o anúncio de vocês");
+
+    expect(await syncWhatsAppInbox()).toEqual({ imported: 0, unknown: 1, failed: 0 });
+    expect(await listUnknownMessages()).toMatchObject([{ company_id: id, company_name: "Sem Abordagem" }]);
+  });
+
+  it("usa o horário real da mensagem (não o do sync) e reimporta o que falhou", async () => {
+    const id = (await importCompany({ name: "Horário Real", city: "Cuiabá", phone: "(65) 99777-8888" }, "MANUAL")).id;
+    await createProspect(id);
+    await event("wx3", "5565997778888", "Bom dia", { event_at: "2026-10-12T09:00:00.000Z" });
+
+    expect(await syncWhatsAppInbox()).toMatchObject({ imported: 1 });
+    expect((await loadThread(id)).messages[0].created_at.startsWith("2026-10-12T09:00:00")).toBe(true);
+
+    // Falha simulada: evento volta como "falhou" e é reimportado pelo botão.
+    await getSupabase().from("whatsapp_events").insert({ wamid: "wx4", direction: "IN", status: "received", phone: "5565997778888", body: "Segunda", processed: 3 });
+    expect(await countFailedMessages()).toBe(1);
+    expect(await retryFailedMessages()).toMatchObject({ imported: 1 });
+    expect(await countFailedMessages()).toBe(0);
+  });
+
+  it("falha de entrega avisada pela Meta aparece para você dispensar", async () => {
+    await getSupabase().from("whatsapp_events").insert({ wamid: "wx5", direction: "STATUS", status: "failed", phone: "5565990001111", body: "Número sem WhatsApp" });
+
+    const [failure] = await listDeliveryFailures();
+    expect(failure).toMatchObject({ phone: "5565990001111", reason: "Número sem WhatsApp" });
+
+    await dismissDeliveryFailure(failure.id);
+    expect(await listDeliveryFailures()).toEqual([]);
   });
 });
 

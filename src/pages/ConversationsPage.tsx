@@ -24,12 +24,16 @@ import { consolidateChannels } from "../features/contacts/consolidate";
 import { listChannelsRepository } from "../features/contacts/channels.repository";
 import type { StoredChannel } from "../features/contacts/channels.repository";
 import {
+  countFailedMessages,
+  dismissDeliveryFailure,
   dismissUnknownMessage,
+  listDeliveryFailures,
   listUnknownMessages,
+  retryFailedMessages,
   serviceWindowOpen,
   syncWhatsAppInbox,
 } from "../features/whatsapp/inbox.service";
-import type { WhatsAppEvent } from "../features/whatsapp/inbox.service";
+import type { DeliveryFailure, UnknownMessage } from "../features/whatsapp/inbox.service";
 import { sendDraftViaWhatsApp } from "../features/whatsapp/send.service";
 import { getWhatsAppStatus, isWhatsAppReady } from "../features/whatsapp/whatsapp.client";
 import { STATUS_LABEL } from "../features/prospects/prospect.labels";
@@ -76,7 +80,11 @@ export function ConversationsPage({
   }, []);
 
   const [waReady, setWaReady] = useState(false);
-  const [unknown, setUnknown] = useState<WhatsAppEvent[]>([]);
+  const [unknown, setUnknown] = useState<UnknownMessage[]>([]);
+  const [failed, setFailed] = useState(0);
+  const [deliveryFailures, setDeliveryFailures] = useState<DeliveryFailure[]>([]);
+  // Sobe quando chegam mensagens novas: a conversa aberta recarrega sozinha.
+  const [syncTick, setSyncTick] = useState(0);
 
   // Traz as respostas recebidas pelo WhatsApp oficial (a cada minuto com a tela aberta).
   useEffect(() => {
@@ -84,16 +92,25 @@ export function ConversationsPage({
 
     async function tick() {
       try {
-        await syncWhatsAppInbox();
+        const result = await syncWhatsAppInbox();
+
+        if (result.imported > 0) setSyncTick((t) => t + 1);
+
         setUnknown(await listUnknownMessages());
+        setFailed(await countFailedMessages());
+        setDeliveryFailures(await listDeliveryFailures());
       } catch {
         // sem WhatsApp configurado: nada a sincronizar
+      }
+
+      // Falha passageira ao consultar o estado não esconde o botão de envio para sempre.
+      if (!cancelled) {
+        void getWhatsAppStatus().then((st) => !cancelled && setWaReady(isWhatsAppReady(st)));
       }
 
       if (!cancelled) await refresh();
     }
 
-    void getWhatsAppStatus().then((st) => !cancelled && setWaReady(isWhatsAppReady(st)));
     void tick();
 
     const timer = setInterval(() => void tick(), 60_000);
@@ -180,12 +197,57 @@ export function ConversationsPage({
           </div>
         )}
 
+        {failed > 0 && (
+          <div className="warn-box">
+            <strong>{failed} mensagem(ns) recebida(s) não puderam ser importadas.</strong>
+            <div className="outreach-actions">
+              <button
+                type="button"
+                onClick={() =>
+                  void retryFailedMessages().then(async () => {
+                    setFailed(await countFailedMessages());
+                    void refresh();
+                  })
+                }
+              >
+                Tentar de novo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {deliveryFailures.length > 0 && (
+          <div className="warn-box">
+            <strong>Mensagens que o WhatsApp não entregou ({deliveryFailures.length})</strong>
+            {deliveryFailures.map((d) => (
+              <p key={d.id}>
+                <small className="muted">+{d.phone}</small> {d.reason ?? "Falha na entrega."}{" "}
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() =>
+                    void dismissDeliveryFailure(d.id).then(async () =>
+                      setDeliveryFailures(await listDeliveryFailures()),
+                    )
+                  }
+                >
+                  Dispensar
+                </button>
+              </p>
+            ))}
+          </div>
+        )}
+
         {unknown.length > 0 && (
           <div className="warn-box">
-            <strong>Mensagens de números sem empresa ({unknown.length})</strong>
+            <strong>Mensagens fora da abordagem ({unknown.length})</strong>
             {unknown.map((u) => (
               <p key={u.id}>
-                <small className="muted">+{u.phone}{u.name ? ` · ${u.name}` : ""}</small>
+                <small className="muted">
+                  +{u.phone}
+                  {u.name ? ` · ${u.name}` : ""}
+                  {u.company_name ? ` · ${u.company_name} (ainda não está em abordagem)` : " · número sem empresa"}
+                </small>
                 <br />
                 {u.body}{" "}
                 <button
@@ -213,6 +275,7 @@ export function ConversationsPage({
             texts={texts}
             setText={setText}
             waReady={waReady}
+            reloadKey={syncTick}
             onChanged={() => void refresh()}
             onOpenCompany={onOpenCompany}
           />
@@ -234,10 +297,12 @@ function ThreadView({
   texts,
   setText,
   waReady,
+  reloadKey,
   onChanged,
   onOpenCompany,
 }: {
   waReady: boolean;
+  reloadKey: number;
   summary: ConversationSummary;
   texts: Record<string, string>;
   setText: (key: string, value: string) => void;
@@ -276,7 +341,7 @@ function ThreadView({
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, reloadKey]);
 
   const messageCount = thread?.messages.length ?? 0;
 
@@ -289,11 +354,12 @@ function ThreadView({
       setBusy(name);
       setError("");
       await fn();
-      await load();
-      onChanged();
     } catch (err) {
       setError(errorMessage(err, "Não foi possível concluir a ação."));
     } finally {
+      // Recarrega mesmo quando falhou: o rascunho pode já ter mudado.
+      await load();
+      onChanged();
       setBusy("");
     }
   }

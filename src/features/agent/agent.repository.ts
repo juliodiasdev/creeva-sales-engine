@@ -71,6 +71,8 @@ export async function insertMessageRepository(input: {
   intent?: DraftIntent | null;
   model?: string | null;
   evidenceUsed?: string[];
+  /** Horário real da mensagem (ex.: o da Meta), quando diferente de "agora". */
+  createdAt?: string;
 }): Promise<number> {
   const row = unwrap(
     await getSupabase()
@@ -87,6 +89,7 @@ export async function insertMessageRepository(input: {
         evidence_used: input.evidenceUsed
           ? JSON.stringify(input.evidenceUsed)
           : null,
+        ...(input.createdAt ? { created_at: input.createdAt } : {}),
       })
       .select("id")
       .single(),

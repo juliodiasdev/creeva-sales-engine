@@ -6,7 +6,7 @@ import { isCompanySuppressed } from "../compliance/suppression.service";
 import { listChannelsRepository } from "../contacts/channels.repository";
 import { consolidateChannels } from "../contacts/consolidate";
 
-import { serviceWindowOpen } from "./inbox.service";
+import { serviceWindowOpen, syncWhatsAppInbox } from "./inbox.service";
 import { sendWhatsAppText } from "./whatsapp.client";
 
 /** Número do contato: o mesmo que escreveu para nós; senão o WhatsApp cadastrado. */
@@ -47,6 +47,9 @@ export async function sendDraftViaWhatsApp(
   sending.add(messageId);
 
   try {
+    // Aplica antes qualquer pedido de parar que ainda não foi importado.
+    await syncWhatsAppInbox().catch(() => undefined);
+
     const draft = await getMessageRepository(messageId);
 
     if (!draft || draft.status !== "DRAFT" || draft.direction !== "OUT") {
@@ -78,7 +81,13 @@ export async function sendDraftViaWhatsApp(
     const { wamid } = await sendWhatsAppText(to, final);
 
     // Registra no histórico e no funil (compare-and-set: sem envio duplicado).
-    await approveDraft(messageId, final);
+    try {
+      await approveDraft(messageId, final);
+    } catch {
+      throw new Error(
+        "A mensagem FOI enviada pelo WhatsApp, mas não conseguimos registrar no histórico. Não envie de novo: use “Já enviei (por fora)”.",
+      );
+    }
 
     return { wamid };
   } finally {

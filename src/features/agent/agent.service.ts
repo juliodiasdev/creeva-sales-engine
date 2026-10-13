@@ -113,8 +113,11 @@ const MAX_LEAD_CHARS = 1500;
 
 /** Texto do contato vai delimitado e truncado: é dado de terceiro, nunca instrução. */
 const wrapLead = (body: string) =>
+  // "<" e ">" do contato viram aspas angulares comuns: ele nunca consegue
+  // escrever ou "montar" uma tag que feche o bloco de texto de terceiro.
   `<mensagem_do_contato>${body
-    .replace(/<\/?mensagem_do_contato>/gi, "")
+    .replace(/</g, "‹")
+    .replace(/>/g, "›")
     .slice(0, MAX_LEAD_CHARS)}</mensagem_do_contato>`;
 
 function renderHistory(messages: ConversationMessage[]): string {
@@ -125,6 +128,12 @@ function renderHistory(messages: ConversationMessage[]): string {
       m.direction === "IN" ? `[Contato] ${wrapLead(m.body)}` : `[Nós] ${m.body}`,
     )
     .join("\n");
+}
+
+class StaleDraftError extends Error {
+  constructor() {
+    super("Chegou uma mensagem nova do contato enquanto o Claude escrevia. Gere a resposta de novo.");
+  }
 }
 
 /** Uma geração por empresa por vez (evita rascunhos duplicados). */
@@ -255,6 +264,13 @@ async function draftReplyUnlocked(
     );
 
     try {
+      // Chegou mensagem nova enquanto o Claude escrevia? O rascunho já nasceu velho.
+      const latest = (await listMessagesRepository(companyId)).filter((m) => m.status !== "DRAFT");
+
+      if (latest[latest.length - 1]?.id !== sent[sent.length - 1].id) {
+        throw new StaleDraftError();
+      }
+
       const draft = validateDraft(json, { signalTypes });
 
       if (draft.intent === "HANDOFF") {
@@ -282,6 +298,8 @@ async function draftReplyUnlocked(
 
       return { messageId, message: draft.message, intent: draft.intent };
     } catch (err) {
+      if (err instanceof StaleDraftError) throw err;
+
       lastError = err instanceof Error ? err.message : String(err);
 
       turns.push(

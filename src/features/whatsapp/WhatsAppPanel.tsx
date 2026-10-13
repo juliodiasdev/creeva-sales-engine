@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ErrorMessage } from "../../components/ErrorMessage";
 import { errorMessage } from "../../lib/format";
+import { normalizePhone } from "../../lib/normalize";
 import { loadConfig } from "../../lib/supabase";
 
 import { getWhatsAppStatus, isWhatsAppReady, sendWhatsAppText } from "./whatsapp.client";
@@ -38,7 +39,11 @@ export function WhatsAppPanel() {
       setBusy(true);
       setError("");
       setMessage("");
-      await sendWhatsAppText(to, "Teste de conexão da Creava Digital. Se você recebeu esta mensagem, está tudo certo.");
+      const phone = normalizePhone(to);
+
+      if (!phone) throw new Error("Informe o número com DDD, ex.: 65 99999-1111.");
+
+      await sendWhatsAppText(`55${phone}`, "Teste de conexão da Creava Digital. Se você recebeu esta mensagem, está tudo certo.");
       setMessage("Mensagem de teste enviada. Confira no celular.");
     } catch (err) {
       setError(errorMessage(err, "Não foi possível enviar o teste."));

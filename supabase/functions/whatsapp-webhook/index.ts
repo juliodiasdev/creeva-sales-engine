@@ -92,6 +92,9 @@ export function messageText(m: Record<string, any>): string {
   }
 }
 
+/** Tipos que não são uma resposta do contato (reação, aviso do sistema...). */
+const IGNORED_TYPES = new Set(["reaction", "system", "unsupported", "ephemeral", "request_welcome"]);
+
 /** Extrai mensagens recebidas e atualizações de status do payload da Meta. */
 export function parseWebhook(payload: any): WaEvent[] {
   const events: WaEvent[] = [];
@@ -109,7 +112,7 @@ export function parseWebhook(payload: any): WaEvent[] {
       );
 
       for (const m of Array.isArray(value.messages) ? value.messages : []) {
-        if (!m?.id || !m?.from) continue;
+        if (!m?.id || !m?.from || IGNORED_TYPES.has(String(m.type))) continue;
 
         events.push({
           wamid: String(m.id),

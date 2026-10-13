@@ -463,4 +463,5 @@ begin
   end loop;
 end $$;
 
+revoke execute on function reset_identity_sequences() from public, anon;
 grant execute on function reset_identity_sequences() to authenticated;

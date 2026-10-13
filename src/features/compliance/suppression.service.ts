@@ -112,6 +112,25 @@ export async function suppressCompany(
   return rows.length;
 }
 
+/** Suprime um telefone avulso (ex.: quem pediu para parar mas não é de nenhuma empresa cadastrada). */
+export async function suppressPhone(
+  variants: string[],
+  reason: string,
+): Promise<void> {
+  const values = [...new Set(variants.map((v) => v.trim()).filter(Boolean))];
+
+  if (values.length === 0) return;
+
+  unwrap(
+    await getSupabase()
+      .from("suppressions")
+      .upsert(
+        values.map((value) => ({ kind: "PHONE", value, reason })),
+        { onConflict: "kind,value", ignoreDuplicates: true },
+      ),
+  );
+}
+
 /** A empresa (por qualquer identificador) está na lista de supressão? */
 export async function isCompanySuppressed(
   companyId: number,

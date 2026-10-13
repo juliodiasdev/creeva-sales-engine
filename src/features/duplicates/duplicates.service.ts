@@ -287,6 +287,14 @@ export async function mergeCompanies(
   );
 
   // 3b) a mesclagem herda o pedido de "não contatar" de qualquer um dos dois
+  // eventos do WhatsApp (número real do contato) seguem a empresa mesclada
+  unwrap(
+    await supabase
+      .from("whatsapp_events")
+      .update({ company_id: masterId })
+      .eq("company_id", duplicateId),
+  );
+
   if (wasSuppressed) {
     await confirmOptOut(
       masterId,

@@ -98,6 +98,7 @@ export async function logOutgoingMessage(
 export async function recordIncomingMessage(
   companyId: number,
   body: string,
+  options: { receivedAt?: string | null } = {},
 ): Promise<{
   messageId: number;
   optOutSuspected: boolean;
@@ -128,6 +129,7 @@ export async function recordIncomingMessage(
     author: "LEAD",
     body: text,
     status: "RECEIVED",
+    ...(options.receivedAt ? { createdAt: options.receivedAt } : {}),
   });
 
   if (prospect && !hardStop) {

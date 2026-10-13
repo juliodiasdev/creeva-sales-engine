@@ -71,6 +71,18 @@ describe("parseWebhook", () => {
     expect(events[2]).toMatchObject({ wamid: "wamid.OUT", direction: "STATUS", status: "read" });
   });
 
+  it("reação e aviso do sistema não são resposta do contato", () => {
+    const events = parseWebhook({
+      entry: [{ changes: [{ field: "messages", value: { messages: [
+        { id: "r1", from: "5565", type: "reaction", reaction: { emoji: "👍" } },
+        { id: "r2", from: "5565", type: "system", system: { body: "mudou de número" } },
+        { id: "r3", from: "5565", type: "text", text: { body: "Oi" } },
+      ] } }] }],
+    });
+
+    expect(events.map((e) => e.wamid)).toEqual(["r3"]);
+  });
+
   it("ignora payloads sem mensagens e formatos inesperados", () => {
     expect(parseWebhook(null)).toEqual([]);
     expect(parseWebhook({ entry: [{ changes: [{ field: "messages", value: {} }] }] })).toEqual([]);
