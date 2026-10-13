@@ -18,6 +18,7 @@ import { runDiagnostics } from "../features/diagnostics/diagnostics.service";
 import type { DiagnosticStep } from "../features/diagnostics/diagnostics.service";
 
 import { testOpenAiConnection } from "../features/ai/openai.client";
+import { WhatsAppPanel } from "../features/whatsapp/WhatsAppPanel";
 import { testClaudeConnection } from "../features/ai/anthropic.client";
 
 import {
@@ -364,6 +365,8 @@ export function SettingsPage() {
         {message && <p className="muted">{message}</p>}
         <ErrorMessage message={error} />
       </section>
+
+      <WhatsAppPanel />
 
       <section className="panel">
         <div className="panel-title">

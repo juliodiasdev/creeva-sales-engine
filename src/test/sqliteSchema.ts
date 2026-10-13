@@ -387,6 +387,28 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 8,
+    name: "whatsapp_events",
+    statements: [
+      `CREATE TABLE whatsapp_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        wamid TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT '',
+        phone TEXT,
+        name TEXT,
+        body TEXT,
+        raw TEXT,
+        processed INTEGER NOT NULL DEFAULT 0,
+        company_id INTEGER,
+        event_at DATETIME,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (wamid, direction, status)
+      )`,
+      `CREATE INDEX idx_wa_events_processed ON whatsapp_events(processed, direction)`,
+    ],
+  },
 ];
 
 export async function runMigrations(

@@ -23,6 +23,15 @@ import { channelOpenUrl } from "../features/contacts/channels.engine";
 import { consolidateChannels } from "../features/contacts/consolidate";
 import { listChannelsRepository } from "../features/contacts/channels.repository";
 import type { StoredChannel } from "../features/contacts/channels.repository";
+import {
+  dismissUnknownMessage,
+  listUnknownMessages,
+  serviceWindowOpen,
+  syncWhatsAppInbox,
+} from "../features/whatsapp/inbox.service";
+import type { WhatsAppEvent } from "../features/whatsapp/inbox.service";
+import { sendDraftViaWhatsApp } from "../features/whatsapp/send.service";
+import { getWhatsAppStatus, isWhatsAppReady } from "../features/whatsapp/whatsapp.client";
 import { STATUS_LABEL } from "../features/prospects/prospect.labels";
 
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -66,8 +75,33 @@ export function ConversationsPage({
     }
   }, []);
 
+  const [waReady, setWaReady] = useState(false);
+  const [unknown, setUnknown] = useState<WhatsAppEvent[]>([]);
+
+  // Traz as respostas recebidas pelo WhatsApp oficial (a cada minuto com a tela aberta).
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+
+    async function tick() {
+      try {
+        await syncWhatsAppInbox();
+        setUnknown(await listUnknownMessages());
+      } catch {
+        // sem WhatsApp configurado: nada a sincronizar
+      }
+
+      if (!cancelled) await refresh();
+    }
+
+    void getWhatsAppStatus().then((st) => !cancelled && setWaReady(isWhatsAppReady(st)));
+    void tick();
+
+    const timer = setInterval(() => void tick(), 60_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [refresh]);
 
   const visible = useMemo(
@@ -145,6 +179,30 @@ export function ConversationsPage({
             ))}
           </div>
         )}
+
+        {unknown.length > 0 && (
+          <div className="warn-box">
+            <strong>Mensagens de números sem empresa ({unknown.length})</strong>
+            {unknown.map((u) => (
+              <p key={u.id}>
+                <small className="muted">+{u.phone}{u.name ? ` · ${u.name}` : ""}</small>
+                <br />
+                {u.body}{" "}
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() =>
+                    void dismissUnknownMessage(u.id).then(async () =>
+                      setUnknown(await listUnknownMessages()),
+                    )
+                  }
+                >
+                  Dispensar
+                </button>
+              </p>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="conv-thread">
@@ -154,6 +212,7 @@ export function ConversationsPage({
             summary={current}
             texts={texts}
             setText={setText}
+            waReady={waReady}
             onChanged={() => void refresh()}
             onOpenCompany={onOpenCompany}
           />
@@ -174,9 +233,11 @@ function ThreadView({
   summary,
   texts,
   setText,
+  waReady,
   onChanged,
   onOpenCompany,
 }: {
+  waReady: boolean;
   summary: ConversationSummary;
   texts: Record<string, string>;
   setText: (key: string, value: string) => void;
@@ -393,8 +454,23 @@ function ThreadView({
               </button>
             )}
 
+            {waReady && serviceWindowOpen(messages) && (
+              <button
+                type="button"
+                disabled={!!busy}
+                onClick={() =>
+                  void run("send", async () => {
+                    await sendDraftViaWhatsApp(draft.id, texts[draftKey(draft.id)] ?? draft.body);
+                  })
+                }
+              >
+                {busy === "send" ? "Enviando…" : "Enviar pelo WhatsApp"}
+              </button>
+            )}
+
             <button
               type="button"
+              className={waReady && serviceWindowOpen(messages) ? "secondary" : undefined}
               disabled={!!busy}
               onClick={() =>
                 void run("approve", () =>
@@ -402,7 +478,7 @@ function ThreadView({
                 )
               }
             >
-              Já enviei
+              Já enviei (por fora)
             </button>
 
             <button

@@ -35,6 +35,7 @@ import { initApp } from "./lib/init";
 import { getSession, onAuthChange, signOut } from "./lib/auth";
 import { loadConfig } from "./lib/supabase";
 
+import { syncWhatsAppInbox } from "./features/whatsapp/inbox.service";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { LoginPage } from "./pages/LoginPage";
 import { SetupPage } from "./pages/SetupPage";
@@ -187,6 +188,19 @@ function App() {
     return () => {
       cancelled = true;
     };
+  }, [phase]);
+
+  // Respostas do WhatsApp oficial entram no histórico mesmo fora da tela de Conversas.
+  useEffect(() => {
+    if (phase !== "ready") return;
+
+    const run = () => void syncWhatsAppInbox().catch(() => undefined);
+
+    run();
+
+    const timer = setInterval(run, 60_000);
+
+    return () => clearInterval(timer);
   }, [phase]);
 
   // Login/logout em tempo real (inclui expiração da sessão).

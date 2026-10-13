@@ -1125,3 +1125,7 @@ button.small-btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
 .queue-item .task-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
 .queue-item textarea { width: 100%; min-height: 130px; resize: vertical; }
 .queue-item .task-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 260px; }
+
+.steps-list { display: flex; flex-direction: column; gap: 10px; padding-left: 20px; }
+.steps-list ul { margin: 6px 0 0; }
+code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
