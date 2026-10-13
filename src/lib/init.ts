@@ -13,6 +13,7 @@ export async function initApp(): Promise<void> {
     () => supabase.from("companies").select("id,list_id").limit(1),
     () => supabase.from("conversations").select("id").limit(1),
     () => supabase.from("suppressions").select("id").limit(1),
+    () => supabase.from("bottleneck_feedback").select("id").limit(1),
     () => supabase.from("ai_analyses").select("id,bottlenecks").limit(1),
   ];
 

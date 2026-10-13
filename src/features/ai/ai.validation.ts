@@ -118,6 +118,8 @@ export interface AiBottleneck {
   service_key: string;
   impact: string;
   confidence: number;
+  /** Pergunta de descoberta para a ligação (confirma o gargalo sem afirmar). */
+  question?: string;
 }
 
 export interface AiPlanResult {
@@ -197,6 +199,11 @@ export function validatePlan(
         service_key: String(b.service_key),
         impact: String(b.impact ?? "").trim().slice(0, 400),
         confidence,
+        ...(typeof b.question === "string" &&
+        b.question.trim() &&
+        !forbiddenContent(b.question)
+          ? { question: b.question.trim().slice(0, 250) }
+          : {}),
       });
     } else {
       dropped++;

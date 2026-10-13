@@ -18,6 +18,7 @@ export type SettingKey =
   | "company_name"
   | "openai_model"
   | "anthropic_model"
+  | "daily_last_run"
   | "data_repairs";
 
 export const DEFAULTS: Partial<Record<SettingKey, string>> = {

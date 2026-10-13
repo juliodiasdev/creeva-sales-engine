@@ -141,7 +141,7 @@ export async function planCompanyWithAi(
       content: `Analise a empresa e ajude a decidir COMO vender os serviços da ${agency}${seller ? ` (vendedor: ${seller})` : ""}.
 Responda JSON com:
 - summary, main_problem, opportunity, recommended_offer, outreach_angle (strings) e confidence (0 a 1);
-- bottlenecks: lista de gargalos do negócio que a Creava resolve, cada um {"title", "evidence", "service_key", "impact", "confidence"}. "evidence" é a lista de TIPOS de sinais (da lista de sinais dos dados) que provam o gargalo: gargalo sem sinal existente NÃO deve ser listado. "impact" é o efeito provável no negócio, em 1 frase, sem números inventados;
+- bottlenecks: lista de gargalos do negócio que a Creava resolve, cada um {"title", "evidence", "service_key", "impact", "confidence", "question"}. "evidence" é a lista de TIPOS de sinais (da lista de sinais dos dados) que provam o gargalo: gargalo sem sinal existente NÃO deve ser listado. "impact" é o efeito provável no negócio, em 1 frase, sem números inventados; "question" é UMA pergunta curta e aberta para o vendedor fazer na ligação e descobrir se o gargalo é real (ex.: "Como os clientes costumam pedir um orçamento hoje?"), sem afirmar o problema e sem números;
 - recommended_services: lista de {"service_key", "reason", "pitch"} usando SOMENTE chaves do catálogo e razões baseadas nos dados;
 - approaches: até 3 abordagens {"channel", "service_key", "angle", "message", "evidence_used"}. channel deve estar em ${JSON.stringify(channelKinds)}; message curta (máx. 600 caracteres), tom humano, sem links; evidence_used lista APENAS tipos de sinal que existem nos dados (lista vazia se nenhum).
 Só afirme problemas que correspondam a um sinal listado.

@@ -181,6 +181,7 @@ export async function listPendingTasksRepository(): Promise<
       return [
         {
           ...t,
+          company_id: Number(prospect.company_id),
           company_name:
             companyById.get(Number(prospect.company_id))?.name ?? "—",
           prospect_status: prospect.status,
