@@ -30,12 +30,17 @@ export interface SendEnv {
 }
 
 /** Traduz erros comuns da Meta em orientação em português. */
-export function describeMetaError(code: number | undefined, message: string): string {
+export function describeMetaError(
+  code: number | undefined,
+  message: string,
+  subcode?: number,
+): string {
   if (code === 190) return "Token da Meta inválido ou expirado. Gere um token permanente do usuário do sistema.";
   if (code === 131047) return "Fora da janela de 24 horas: só é possível responder até 24h depois da última mensagem da pessoa (ou com um modelo aprovado).";
   if (code === 131030) return "Este número não está liberado como destinatário de teste na Meta.";
   if (code === 131026) return "A mensagem não pôde ser entregue (número sem WhatsApp ou bloqueado).";
   if (code === 130429 || code === 80007) return "Limite de envio da Meta atingido. Tente novamente mais tarde.";
+  if (code === 100 && subcode === 33) return "O ID do número de telefone está errado ou o token não tem acesso a ele. Confira WHATSAPP_PHONE_NUMBER_ID (é o ID do número, não o da conta).";
   if (code === 131056) return "Muitas mensagens para o mesmo número em pouco tempo.";
 
   return `A Meta recusou o envio${code ? ` (código ${code})` : ""}: ${message}`;
@@ -125,12 +130,12 @@ export async function handleRequest(
 
   const data = (await res.json().catch(() => ({}))) as {
     messages?: { id: string }[];
-    error?: { code?: number; message?: string };
+    error?: { code?: number; error_subcode?: number; message?: string };
   };
 
   if (!res.ok || !data.messages?.[0]?.id) {
     return json(
-      { ok: false, error: describeMetaError(data.error?.code, data.error?.message ?? "erro desconhecido") },
+      { ok: false, error: describeMetaError(data.error?.code, data.error?.message ?? "erro desconhecido", data.error?.error_subcode) },
       502,
     );
   }

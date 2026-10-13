@@ -1,4 +1,4 @@
-import { fetchByIds, getSupabase, unwrap } from "../../lib/store";
+import { fetchByIds, getSupabase, nowIso, unwrap } from "../../lib/store";
 
 import { findProspectByCompanyRepository } from "../agent/agent.repository";
 import { recordIncomingMessage } from "../agent/conversation.service";
@@ -18,6 +18,7 @@ export interface WhatsAppEvent {
   company_id: number | null;
   event_at: string | null;
   created_at: string;
+  attempts?: number;
 }
 
 /** Empresa dona de um telefone (cadastro do Google ou canais encontrados). */
@@ -52,12 +53,18 @@ export async function findCompanyByPhone(phone: string): Promise<number | null> 
   return byChannel[0] ? Number(byChannel[0].company_id) : null;
 }
 
-/** processed: 0 novo · 1 tratado · 2 sem empresa · 3 falhou */
+/**
+ * processed: 0 novo · 4 em processamento · 1 tratado · 2 fora da abordagem · 3 falhou (3 tentativas)
+ * "Em processamento" tem prazo: se o app fechar no meio, o evento volta para a fila.
+ */
+const CLAIM_TTL_MS = 5 * 60_000;
+const MAX_ATTEMPTS = 3;
+
 async function claim(id: number): Promise<boolean> {
   const rows = unwrap(
     await getSupabase()
       .from("whatsapp_events")
-      .update({ processed: 1 })
+      .update({ processed: 4, claimed_at: nowIso() })
       .eq("id", id)
       .eq("processed", 0)
       .select("id"),
@@ -70,8 +77,37 @@ async function finish(id: number, processed: number, companyId: number | null) {
   unwrap(
     await getSupabase()
       .from("whatsapp_events")
-      .update({ processed, company_id: companyId })
+      .update({ processed, company_id: companyId, claimed_at: null })
       .eq("id", id),
+  );
+}
+
+/** Falhou: tenta de novo nos próximos ciclos; só depois de 3 tentativas vira "falhou". */
+async function fail(event: WhatsAppEvent & { attempts?: number }) {
+  const attempts = Number(event.attempts ?? 0) + 1;
+
+  unwrap(
+    await getSupabase()
+      .from("whatsapp_events")
+      .update({
+        processed: attempts >= MAX_ATTEMPTS ? 3 : 0,
+        attempts,
+        claimed_at: null,
+      })
+      .eq("id", event.id),
+  );
+
+  return attempts >= MAX_ATTEMPTS;
+}
+
+/** Devolve à fila o que ficou "em processamento" por mais que o prazo. */
+async function releaseStaleClaims(): Promise<void> {
+  unwrap(
+    await getSupabase()
+      .from("whatsapp_events")
+      .update({ processed: 0, claimed_at: null })
+      .eq("processed", 4)
+      .lt("claimed_at", new Date(Date.now() - CLAIM_TTL_MS).toISOString()),
   );
 }
 
@@ -101,6 +137,8 @@ export function syncWhatsAppInbox(): Promise<SyncResult> {
 }
 
 async function runSync(): Promise<SyncResult> {
+  await releaseStaleClaims();
+
   const pending = unwrap(
     await getSupabase()
       .from("whatsapp_events")
@@ -147,8 +185,8 @@ async function runSync(): Promise<SyncResult> {
       await finish(event.id, 1, companyId);
       result.imported++;
     } catch {
-      await finish(event.id, 3, event.company_id);
-      result.failed++;
+      // Só conta como falha definitiva depois das tentativas; antes disso volta à fila.
+      if (await fail(event).catch(() => false)) result.failed++;
     }
   }
 
@@ -173,7 +211,7 @@ export async function retryFailedMessages(): Promise<SyncResult> {
   unwrap(
     await getSupabase()
       .from("whatsapp_events")
-      .update({ processed: 0 })
+      .update({ processed: 0, attempts: 0 })
       .eq("direction", "IN")
       .eq("processed", 3),
   );
@@ -239,6 +277,19 @@ export async function listUnknownMessages(limit = 20): Promise<UnknownMessage[]>
   }));
 }
 
+/** O número desconhecido pediu para parar: suprime o telefone e tira a mensagem da lista. */
+export async function suppressUnknownMessage(id: number): Promise<void> {
+  const rows = unwrap(
+    await getSupabase().from("whatsapp_events").select("phone").eq("id", id).limit(1),
+  ) as { phone: string | null }[];
+
+  if (rows[0]?.phone) {
+    await suppressPhone(phoneVariants(rows[0].phone), "Pedido de parar recebido por WhatsApp");
+  }
+
+  await dismissUnknownMessage(id);
+}
+
 /** Dispensa uma mensagem de número desconhecido (sai da lista). */
 export async function dismissUnknownMessage(id: number): Promise<void> {
   unwrap(
@@ -254,24 +305,50 @@ export async function dismissUnknownMessage(id: number): Promise<void> {
 
 export const SERVICE_WINDOW_HOURS = 24;
 
-/**
- * A janela de atendimento abre quando o CONTATO escreve no WhatsApp. Registros
- * de ligação ("[Ligação] …") não abrem a janela.
- */
-export function serviceWindowOpen(
-  messages: { direction: string; body: string; created_at: string; status: string }[],
+/** A janela abre quando o CONTATO escreve (para a Meta): vale o horário real do evento. */
+export function windowOpenFromInbound(
+  lastInboundAt: string | null,
   now = new Date(),
 ): boolean {
-  const lastIn = [...messages]
-    .reverse()
-    .find(
-      (m) =>
-        m.direction === "IN" &&
-        m.status !== "DRAFT" &&
-        !m.body.startsWith("[Ligação]"),
-    );
+  if (!lastInboundAt) return false;
 
-  if (!lastIn) return false;
+  const age = now.getTime() - new Date(lastInboundAt).getTime();
 
-  return now.getTime() - new Date(lastIn.created_at).getTime() < SERVICE_WINDOW_HOURS * 3_600_000;
+  return age >= 0 && age < SERVICE_WINDOW_HOURS * 3_600_000;
 }
+
+/**
+ * Última mensagem que a Meta recebeu desta empresa. Respostas coladas à mão ou
+ * registros de ligação NÃO abrem a janela: só o que chegou pelo WhatsApp oficial.
+ */
+export async function lastInboundAt(companyId: number): Promise<string | null> {
+  const rows = unwrap(
+    await getSupabase()
+      .from("whatsapp_events")
+      .select("event_at,created_at")
+      .eq("direction", "IN")
+      .eq("company_id", companyId)
+      .order("id", { ascending: false })
+      .limit(1),
+  ) as { event_at: string | null; created_at: string }[];
+
+  return rows[0] ? (rows[0].event_at ?? rows[0].created_at) : null;
+}
+
+/** Quando chegou o último evento do webhook (prova de que o recebimento funciona). */
+export async function lastWebhookEventAt(): Promise<string | null> {
+  const rows = unwrap(
+    await getSupabase()
+      .from("whatsapp_events")
+      .select("created_at")
+      .in("direction", ["IN", "STATUS"])
+      .order("id", { ascending: false })
+      .limit(1),
+  ) as { created_at: string }[];
+
+  return rows[0]?.created_at ?? null;
+}
+
+/** Marcador de mídia sem texto: o conteúdo real só se vê no WhatsApp. */
+export const isMediaPlaceholder = (body: string): boolean =>
+  /^\[[^\]]*(recebid[ao]|abra no WhatsApp)[^\]]*\]$/i.test(body.trim());

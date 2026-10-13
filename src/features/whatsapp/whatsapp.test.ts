@@ -34,9 +34,11 @@ import {
   findCompanyByPhone,
   listDeliveryFailures,
   listUnknownMessages,
+  isMediaPlaceholder,
+  lastInboundAt,
   retryFailedMessages,
-  serviceWindowOpen,
   syncWhatsAppInbox,
+  windowOpenFromInbound,
 } from "./inbox.service";
 import { sendDraftViaWhatsApp } from "./send.service";
 
@@ -166,16 +168,80 @@ describe("caixa de entrada: casos de borda", () => {
 
 describe("janela de 24 horas", () => {
   const now = new Date("2026-10-13T12:00:00Z");
-  const msg = (direction: string, body: string, hoursAgo: number, status = "RECEIVED") => ({
-    direction, body, status, created_at: new Date(now.getTime() - hoursAgo * 3_600_000).toISOString(),
+  const ago = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
+
+  it("abre só com mensagem que a Meta recebeu nas últimas 24h", () => {
+    expect(windowOpenFromInbound(ago(2), now)).toBe(true);
+    expect(windowOpenFromInbound(ago(25), now)).toBe(false);
+    expect(windowOpenFromInbound(null, now)).toBe(false);
+    expect(windowOpenFromInbound(new Date(now.getTime() + 3_600_000).toISOString(), now)).toBe(false);
   });
 
-  it("abre só com mensagem do contato nas últimas 24h; ligação não conta", () => {
-    expect(serviceWindowOpen([msg("IN", "Oi", 2)], now)).toBe(true);
-    expect(serviceWindowOpen([msg("IN", "Oi", 25)], now)).toBe(false);
-    expect(serviceWindowOpen([msg("OUT", "Olá", 1, "SENT")], now)).toBe(false);
-    expect(serviceWindowOpen([msg("IN", "[Ligação] Atendeu e tem interesse", 1)], now)).toBe(false);
-    expect(serviceWindowOpen([msg("IN", "Oi", 30), msg("IN", "Voltei", 1)], now)).toBe(true);
+  it("resposta colada à mão ou ligação NÃO abre a janela; o evento real da Meta abre", async () => {
+    const id = (await importCompany({ name: "Janela", city: "Cuiabá", phone: "(65) 99888-0001" }, "MANUAL")).id;
+    await createProspect(id);
+
+    await recordIncomingMessage(id, "Colei esta resposta agora");
+    expect(await lastInboundAt(id)).toBeNull();
+
+    await event("wj1", "5565998880001", "Oi pelo WhatsApp oficial", { event_at: "2026-10-13T10:00:00.000Z" });
+    await syncWhatsAppInbox();
+    expect(await lastInboundAt(id)).toBe("2026-10-13T10:00:00.000Z");
+  });
+});
+
+describe("mídia e falhas", () => {
+  it("reconhece o aviso de mídia sem texto", () => {
+    expect(isMediaPlaceholder("[áudio recebido: abra no WhatsApp para ouvir]")).toBe(true);
+    expect(isMediaPlaceholder("[imagem recebida]")).toBe(true);
+    expect(isMediaPlaceholder("[vídeo recebido: pare de me mandar]")).toBe(true);
+    expect(isMediaPlaceholder("Oi, [áudio] ok")).toBe(false);
+  });
+
+  it("o Claude não responde quando a última mensagem é só mídia (pode ser pedido de parar)", async () => {
+    const id = (await importCompany({ name: "Só Áudio", city: "Cuiabá", phone: "(65) 99888-0002" }, "MANUAL")).id;
+    await createProspect(id);
+    await planCompanyWithAi(id, vi.fn().mockResolvedValue({
+      json: { summary: "s", main_problem: "p", opportunity: "o", recommended_offer: "r", outreach_angle: "a", confidence: 0.5, recommended_services: [], bottlenecks: [], approaches: [] },
+      model: "m",
+    }));
+    await recordIncomingMessage(id, "[áudio recebido: abra no WhatsApp para ouvir]");
+
+    await expect(draftReply(id, {}, vi.fn().mockResolvedValue({ json: reply, model: "m" }))).rejects.toThrow(/mídia/);
+  });
+
+  it("falha passageira volta para a fila e só vira 'falhou' depois de 3 tentativas; claim travado é liberado", async () => {
+    const id = (await importCompany({ name: "Falha Rede", city: "Cuiabá", phone: "(65) 99888-0003" }, "MANUAL")).id;
+    await createProspect(id);
+    await event("wf1", "5565998880003", "Pare de me mandar mensagem");
+
+    const supabase = getSupabase();
+    const original = supabase.from.bind(supabase);
+    let broken = true;
+    vi.spyOn(supabase, "from").mockImplementation(((table: string) => {
+      if (broken && table === "suppressions") throw new Error("rede caiu");
+      return original(table);
+    }) as never);
+
+    // 1ª e 2ª tentativas: volta para a fila; 3ª: falhou de vez.
+    for (const expected of [0, 0, 1]) {
+      expect((await syncWhatsAppInbox()).failed).toBe(expected);
+    }
+
+    expect(await countFailedMessages()).toBe(1);
+
+    // Com a rede de volta, "Tentar de novo" importa e o pedido de parar vale.
+    broken = false;
+    expect(await retryFailedMessages()).toMatchObject({ imported: 1 });
+    expect(await isCompanySuppressed(id)).toBe(true);
+    vi.restoreAllMocks();
+
+    // Evento que ficou "em processamento" (app fechou no meio) volta sozinho depois do prazo.
+    await getSupabase().from("whatsapp_events").insert({
+      wamid: "wf2", direction: "IN", status: "received", phone: "5565998880099", body: "Oi",
+      processed: 4, claimed_at: "2020-01-01T00:00:00.000Z",
+    });
+    expect(await syncWhatsAppInbox()).toMatchObject({ unknown: 1 });
   });
 });
 
@@ -204,6 +270,21 @@ describe("enviar rascunho pelo WhatsApp", () => {
     expect(sent).toMatchObject({ status: "SENT", author: "AI", edited: 1, body: "Obrigado! Posso explicar?" });
   });
 
+  it("se a Meta aceitar mas o funil falhar, a mensagem fica no histórico e o rascunho sai da fila", async () => {
+    const { id, draft } = await ready("(65) 99225-0342", "Clínica Registro");
+    sendWhatsAppText.mockResolvedValue({ wamid: "wamid.OUT2" });
+
+    const agent = await import("../agent/agent.service");
+    vi.spyOn(agent, "approveDraft").mockRejectedValueOnce(new Error("banco indisponível"));
+
+    await expect(sendDraftViaWhatsApp(draft.messageId, "Olá, tudo bem?")).rejects.toThrow(/FOI enviada/);
+
+    const messages = (await loadThread(id)).messages;
+    expect(messages.filter((m) => m.status === "SENT" && m.author === "AI").map((m) => m.body)).toEqual(["Olá, tudo bem?"]);
+    expect(messages.filter((m) => m.status === "DRAFT")).toHaveLength(0);
+    vi.restoreAllMocks();
+  });
+
   it("se a Meta recusar, o rascunho continua pendente (nada é registrado como enviado)", async () => {
     const { id, draft } = await ready();
     sendWhatsAppText.mockRejectedValue(new Error("Token da Meta inválido"));
@@ -215,11 +296,11 @@ describe("enviar rascunho pelo WhatsApp", () => {
   it("bloqueia empresa suprimida e janela fechada, e não envia duas vezes", async () => {
     const { id, draft } = await ready();
 
-    await getSupabase().from("conversation_messages").update({ created_at: "2020-01-01T00:00:00.000Z" }).eq("direction", "IN");
+    await getSupabase().from("whatsapp_events").update({ event_at: "2020-01-01T00:00:00.000Z" }).eq("direction", "IN");
     await expect(sendDraftViaWhatsApp(draft.messageId, "Oi")).rejects.toThrow(/24 horas/);
     expect(sendWhatsAppText).not.toHaveBeenCalled();
 
-    await getSupabase().from("conversation_messages").update({ created_at: new Date().toISOString() }).eq("direction", "IN");
+    await getSupabase().from("whatsapp_events").update({ event_at: new Date().toISOString() }).eq("direction", "IN");
     sendWhatsAppText.mockImplementation(() => new Promise((r) => setTimeout(() => r({ wamid: "w" }), 20)));
     const results = await Promise.allSettled([
       sendDraftViaWhatsApp(draft.messageId, "Oi"),

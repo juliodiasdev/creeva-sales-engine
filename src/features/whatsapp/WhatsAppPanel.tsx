@@ -4,9 +4,12 @@ import { ErrorMessage } from "../../components/ErrorMessage";
 import { errorMessage } from "../../lib/format";
 import { normalizePhone } from "../../lib/normalize";
 import { loadConfig } from "../../lib/supabase";
+import { openExternal } from "../../lib/opener";
 
-import { getWhatsAppStatus, isWhatsAppReady, sendWhatsAppText } from "./whatsapp.client";
-import type { WhatsAppStatus } from "./whatsapp.client";
+import { formatDateTime } from "../../lib/format";
+import { lastWebhookEventAt } from "./inbox.service";
+import { checkWhatsApp, sendWhatsAppText } from "./whatsapp.client";
+import type { WhatsAppCheck } from "./whatsapp.client";
 
 const SECRETS: [string, string][] = [
   ["WHATSAPP_TOKEN", "token permanente do usuário do sistema (Meta)"],
@@ -15,9 +18,12 @@ const SECRETS: [string, string][] = [
   ["META_APP_SECRET", "chave secreta do app (Meta → Configurações do app → Básico)"],
 ];
 
-/** Conexão com o WhatsApp oficial: estado, passo a passo e envio de teste. */
+const RAW = "https://github.com/juliodiasdev/creeva-sales-engine/blob/main/supabase/functions";
+
+/** Conexão com o WhatsApp oficial: estado real, passo a passo e envio de teste. */
 export function WhatsAppPanel() {
-  const [status, setStatus] = useState<WhatsAppStatus | null | undefined>(undefined);
+  const [check, setCheck] = useState<WhatsAppCheck | undefined>(undefined);
+  const [lastEvent, setLastEvent] = useState<string | null>(null);
   const [to, setTo] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -25,25 +31,27 @@ export function WhatsAppPanel() {
 
   const webhook = `${loadConfig()?.url ?? "https://SEU-PROJETO.supabase.co"}/functions/v1/whatsapp-webhook`;
 
-  const check = useCallback(async () => {
-    setStatus(undefined);
-    setStatus(await getWhatsAppStatus());
+  const run = useCallback(async () => {
+    setCheck(undefined);
+    setCheck(await checkWhatsApp());
+    setLastEvent(await lastWebhookEventAt().catch(() => null));
   }, []);
 
   useEffect(() => {
-    void check();
-  }, [check]);
+    void run();
+  }, [run]);
 
   async function sendTest() {
     try {
       setBusy(true);
       setError("");
       setMessage("");
+
       const phone = normalizePhone(to);
 
       if (!phone) throw new Error("Informe o número com DDD, ex.: 65 99999-1111.");
 
-      await sendWhatsAppText(`55${phone}`, "Teste de conexão da Creava Digital. Se você recebeu esta mensagem, está tudo certo.");
+      await sendWhatsAppText(`55${phone}`, "Teste de conexão da Creava Digital. Se você recebeu esta mensagem, o envio está certo.");
       setMessage("Mensagem de teste enviada. Confira no celular.");
     } catch (err) {
       setError(errorMessage(err, "Não foi possível enviar o teste."));
@@ -52,7 +60,7 @@ export function WhatsAppPanel() {
     }
   }
 
-  const ready = isWhatsAppReady(status ?? null);
+  const ready = check?.kind === "ready";
 
   return (
     <section className="panel">
@@ -62,42 +70,47 @@ export function WhatsAppPanel() {
           <h2>Conectar o WhatsApp</h2>
         </div>
 
-        <button type="button" className="secondary" onClick={() => void check()}>
+        <button type="button" className="secondary" onClick={() => void run()}>
           Verificar conexão
         </button>
       </div>
 
-      {status === undefined ? (
+      {check === undefined ? (
         <p className="muted">Verificando…</p>
-      ) : ready ? (
-        <p>
-          <strong>Conectado.</strong> As respostas chegam em Conversas e você pode responder dentro
-          das 24 horas depois da última mensagem da pessoa.
-        </p>
-      ) : status ? (
+      ) : check.kind === "ready" ? (
+        <>
+          <p>
+            <strong>Envio configurado.</strong> O servidor tem o token e o número.
+          </p>
+          <p className={lastEvent ? undefined : "muted"}>
+            {lastEvent
+              ? `Recebimento funcionando: último aviso da Meta em ${formatDateTime(lastEvent)}.`
+              : "Recebimento ainda NÃO confirmado: nenhum aviso da Meta chegou. Peça a alguém para escrever para o número e veja a mensagem aparecer em Conversas. Se não aparecer, confira o webhook (passo 5)."}
+          </p>
+        </>
+      ) : check.kind === "missing_secrets" ? (
         <p className="error">
-          A função de envio existe, mas faltam segredos:{" "}
-          {[!status.configured.token && "WHATSAPP_TOKEN", !status.configured.phoneNumberId && "WHATSAPP_PHONE_NUMBER_ID"]
-            .filter(Boolean)
-            .join(", ")}
-          .
+          A função de envio existe, mas faltam segredos: {check.missing.join(", ")}.
         </p>
-      ) : (
+      ) : check.kind === "not_installed" ? (
         <p className="muted">
           Ainda não conectado: a função <code>whatsapp-send</code> não está instalada no seu
           Supabase. Siga o passo a passo abaixo.
         </p>
+      ) : (
+        <p className="error">{check.message}</p>
       )}
 
-      <details>
+      <details open={!ready}>
         <summary>Passo a passo (uma vez só)</summary>
 
         <ol className="steps-list">
           <li>
             <strong>Meta:</strong> em business.facebook.com crie o portfólio da Creava e, em
             developers.facebook.com, um app do tipo <em>Empresa</em> com o produto{" "}
-            <em>WhatsApp</em>. Conecte o seu número do WhatsApp Business (opção de usar o app já
-            existente, com o aplicativo no celular). Pode ser necessário verificar a empresa.
+            <em>WhatsApp</em>. Conecte o número: o do seu <strong>WhatsApp Business atual</strong>{" "}
+            (opção de continuar usando o aplicativo no celular, se a Meta liberar para o seu
+            número) ou um número novo e dedicado. Pode ser necessário verificar a empresa.
           </li>
           <li>
             <strong>Token permanente:</strong> no portfólio, crie um <em>usuário do sistema</em>, dê a
@@ -105,9 +118,14 @@ export function WhatsAppPanel() {
             <code>whatsapp_business_messaging</code> e <code>whatsapp_business_management</code>.
           </li>
           <li>
-            <strong>Supabase → Edge Functions:</strong> crie a função <code>whatsapp-send</code>{" "}
-            (deixe "Verify JWT" ligado) e a função <code>whatsapp-webhook</code> (desligue "Verify
-            JWT"), colando o código das pastas <code>supabase/functions/…/index.ts</code> do projeto.
+            <strong>Supabase → Edge Functions → Deploy a new function</strong> (no próprio painel):
+            crie <code>whatsapp-send</code> (deixe "Verify JWT" ligado) e{" "}
+            <code>whatsapp-webhook</code> (desligue "Verify JWT"). O código de cada uma está no
+            projeto: abra{" "}
+            <a href={`${RAW}/whatsapp-send/index.ts`} onClick={(e) => { e.preventDefault(); void openExternal(`${RAW}/whatsapp-send/index.ts`); }}>whatsapp-send</a>{" "}
+            e{" "}
+            <a href={`${RAW}/whatsapp-webhook/index.ts`} onClick={(e) => { e.preventDefault(); void openExternal(`${RAW}/whatsapp-webhook/index.ts`); }}>whatsapp-webhook</a>
+            , copie o conteúdo e cole no editor.
           </li>
           <li>
             <strong>Supabase → Edge Functions → Secrets:</strong> cadastre:
@@ -125,7 +143,10 @@ export function WhatsAppPanel() {
             <code>messages</code>.
           </li>
           <li>
-            Volte aqui, clique em <strong>Verificar conexão</strong> e envie um teste.
+            Volte aqui e clique em <strong>Verificar conexão</strong>. Para testar o recebimento,
+            peça a alguém para <strong>escrever para o número</strong>: a mensagem deve aparecer em
+            Conversas. O envio de teste abaixo só chega a quem escreveu nas últimas 24 horas (ou a
+            números de teste cadastrados na Meta).
           </li>
         </ol>
 
@@ -136,18 +157,26 @@ export function WhatsAppPanel() {
       </details>
 
       {ready && (
-        <div className="outreach-actions">
-          <input
-            aria-label="Número para o teste"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            placeholder="Número com DDD, ex.: 65 99999-1111"
-          />
+        <>
+          <div className="outreach-actions">
+            <input
+              aria-label="Número para o teste"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="Número com DDD, ex.: 65 99999-1111"
+            />
 
-          <button type="button" disabled={busy || !to.trim()} onClick={() => void sendTest()}>
-            {busy ? "Enviando…" : "Enviar mensagem de teste"}
-          </button>
-        </div>
+            <button type="button" disabled={busy || !to.trim()} onClick={() => void sendTest()}>
+              {busy ? "Enviando…" : "Enviar mensagem de teste"}
+            </button>
+          </div>
+
+          <p className="muted small">
+            Funciona para quem escreveu para o número nas últimas 24 horas ou para números
+            cadastrados como teste na Meta. Para qualquer outro, a Meta recusa: isso não é erro de
+            configuração.
+          </p>
+        </>
       )}
 
       {message && <p className="muted">{message}</p>}

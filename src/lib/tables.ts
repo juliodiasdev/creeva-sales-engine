@@ -23,7 +23,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
   conversations: ["id","company_id","opted_out","handoff_reason","created_at","updated_at"],
   conversation_messages: ["id","conversation_id","company_id","direction","author","body","status","intent","model","edited","evidence_used","created_at"],
   suppressions: ["id","kind","value","reason","created_at"],
-  whatsapp_events: ["id","wamid","direction","status","phone","name","body","raw","processed","company_id","event_at","created_at"],
+  whatsapp_events: ["id","wamid","direction","status","phone","name","body","raw","processed","company_id","event_at","created_at","attempts","claimed_at"],
   presence_reports: ["id","company_id","score","level","confidence","moment","report","computed_at"],
   enrichment_findings: ["id","company_id","field","value","source_url","evidence","verified","status","model","created_at","decided_at"],
   bottleneck_feedback: ["id","company_id","analysis_id","title","evidence","service_key","verdict","created_at"],

@@ -226,6 +226,8 @@ describe("whatsapp-send", () => {
     expect(res.status).toBe(502);
     expect(data.error).toMatch(/24 horas/);
     expect(describeMetaError(190, "x")).toMatch(/Token/);
+    expect(describeMetaError(100, "Unsupported post request", 33)).toMatch(/ID do número/);
+    expect(parseWebhook({ entry: [{ changes: [{ field: "messages", value: { messages: [{ id: "v", from: "55", type: "video", video: { caption: "pare de mandar" } }] } }] }] })[0].body).toBe("[vídeo recebido: pare de mandar]");
     expect(describeMetaError(999, "boom")).toContain("999");
   });
 });

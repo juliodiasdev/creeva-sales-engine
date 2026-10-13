@@ -30,11 +30,11 @@ import {
   listDeliveryFailures,
   listUnknownMessages,
   retryFailedMessages,
-  serviceWindowOpen,
+  suppressUnknownMessage,
   syncWhatsAppInbox,
 } from "../features/whatsapp/inbox.service";
 import type { DeliveryFailure, UnknownMessage } from "../features/whatsapp/inbox.service";
-import { sendDraftViaWhatsApp } from "../features/whatsapp/send.service";
+import { describeSendTarget, sendDraftViaWhatsApp } from "../features/whatsapp/send.service";
 import { getWhatsAppStatus, isWhatsAppReady } from "../features/whatsapp/whatsapp.client";
 import { STATUS_LABEL } from "../features/prospects/prospect.labels";
 
@@ -260,6 +260,17 @@ export function ConversationsPage({
                   }
                 >
                   Dispensar
+                </button>{" "}
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() =>
+                    void suppressUnknownMessage(u.id).then(async () =>
+                      setUnknown(await listUnknownMessages()),
+                    )
+                  }
+                >
+                  Pediu para parar
                 </button>
               </p>
             ))}
@@ -313,6 +324,7 @@ function ThreadView({
   const [thread, setThread] = useState<Thread | null>(null);
   const [analysis, setAnalysis] = useState<StoredAnalysis | null>(null);
   const [channels, setChannels] = useState<StoredChannel[]>([]);
+  const [target, setTarget] = useState<{ to: string | null; windowOpen: boolean } | null>(null);
   const incoming = texts[`incoming:${companyId}`] ?? "";
   const manual = texts[`manual:${companyId}`] ?? "";
   const setIncoming = (v: string) => setText(`incoming:${companyId}`, v);
@@ -325,12 +337,14 @@ function ThreadView({
   const load = useCallback(async () => {
     try {
       setError("");
-      const [t, a, ch] = await Promise.all([
+      const [t, a, ch, tg] = await Promise.all([
         loadThread(companyId),
         getLatestAnalysis(companyId),
         listChannelsRepository(companyId),
+        describeSendTarget(companyId).catch(() => null),
       ]);
 
+      setTarget(tg);
       setThread(t);
       setAnalysis(a);
       setChannels(ch);
@@ -339,9 +353,10 @@ function ThreadView({
     }
   }, [companyId]);
 
+  // Recarrega quando chega mensagem nova (sync) ou quando o resumo da conversa muda.
   useEffect(() => {
     void load();
-  }, [load, reloadKey]);
+  }, [load, reloadKey, summary.lastAt, summary.messageCount]);
 
   const messageCount = thread?.messages.length ?? 0;
 
@@ -505,6 +520,16 @@ function ThreadView({
             onChange={(e) => setText(draftKey(draft.id), e.target.value)}
           />
 
+          <p className="muted small">
+            {!waReady
+              ? "WhatsApp oficial não conectado: envie manualmente e use “Já enviei (por fora)”."
+              : !target?.to
+                ? "Esta empresa não tem WhatsApp cadastrado."
+                : target.windowOpen
+                  ? `O botão “Enviar pelo WhatsApp” envia para +${target.to}.`
+                  : "Janela de 24 horas fechada: a pessoa não escreveu no WhatsApp oficial nas últimas 24h. Envie manualmente."}
+          </p>
+
           <div className="outreach-actions">
             {whatsapp && (
               <button
@@ -520,15 +545,17 @@ function ThreadView({
               </button>
             )}
 
-            {waReady && serviceWindowOpen(messages) && (
+            {waReady && target?.windowOpen && target.to && (
               <button
                 type="button"
                 disabled={!!busy}
-                onClick={() =>
+                onClick={() => {
+                  if (!window.confirm(`Enviar esta mensagem agora para +${target.to} (${summary.companyName})?`)) return;
+
                   void run("send", async () => {
                     await sendDraftViaWhatsApp(draft.id, texts[draftKey(draft.id)] ?? draft.body);
-                  })
-                }
+                  });
+                }}
               >
                 {busy === "send" ? "Enviando…" : "Enviar pelo WhatsApp"}
               </button>
@@ -536,7 +563,7 @@ function ThreadView({
 
             <button
               type="button"
-              className={waReady && serviceWindowOpen(messages) ? "secondary" : undefined}
+              className={waReady && target?.windowOpen ? "secondary" : undefined}
               disabled={!!busy}
               onClick={() =>
                 void run("approve", () =>

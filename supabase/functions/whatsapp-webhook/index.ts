@@ -80,9 +80,13 @@ export function messageText(m: Record<string, any>): string {
     case "image":
       return `[imagem recebida${m.image?.caption ? `: ${m.image.caption}` : ""}]`;
     case "document":
-      return "[documento recebido: abra no WhatsApp]";
+      return m.document?.caption
+        ? `[documento recebido: ${m.document.caption}]`
+        : "[documento recebido: abra no WhatsApp]";
     case "video":
-      return "[vídeo recebido: abra no WhatsApp]";
+      return m.video?.caption
+        ? `[vídeo recebido: ${m.video.caption}]`
+        : "[vídeo recebido: abra no WhatsApp]";
     case "location":
       return "[localização recebida]";
     case "sticker":

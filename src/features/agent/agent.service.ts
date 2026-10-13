@@ -9,6 +9,7 @@ import {
   suppressedCompanyIds,
 } from "../compliance/suppression.service";
 import { forbiddenContent } from "../../lib/contentGuard";
+import { isMediaPlaceholder } from "../whatsapp/inbox.service";
 import { pendingOptOut } from "./conversation.service";
 import { listSignalsRepository } from "../enrichment/enrichment.repository";
 import { listServices } from "../services/services.service";
@@ -197,6 +198,14 @@ async function draftReplyUnlocked(
   if (sent[sent.length - 1].direction === "OUT") {
     throw new Error(
       "A última mensagem foi nossa: aguarde a resposta do contato.",
+    );
+  }
+
+  const lastInbound = [...sent].reverse().find((m) => m.direction === "IN");
+
+  if (lastInbound && isMediaPlaceholder(lastInbound.body) && !options.ignoreOptOutWarning) {
+    throw new Error(
+      "A última mensagem do contato é uma mídia (áudio, imagem, vídeo ou documento): abra no WhatsApp, veja o que é e cole o texto em “Registrar resposta”. Pode ser um pedido para parar.",
     );
   }
 

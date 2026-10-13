@@ -446,6 +446,14 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 11,
+    name: "whatsapp_events_attempts",
+    statements: [
+      `ALTER TABLE whatsapp_events ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE whatsapp_events ADD COLUMN claimed_at DATETIME`,
+    ],
+  },
 ];
 
 export async function runMigrations(

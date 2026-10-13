@@ -39,8 +39,11 @@ WhatsApp → Configuração → **Webhook**: endereço
 e assine o campo **messages**.
 
 ## 4. Testar
-No app: Configurações → WhatsApp → **Verificar conexão** → **Enviar mensagem de teste**.
-(Em modo de teste a Meta só entrega a números cadastrados como destinatários de teste.)
+1. No app: Configurações → Conectar o WhatsApp → **Verificar conexão**. Deve aparecer "Envio configurado".
+2. **Teste o recebimento**: peça a alguém para escrever para o número. A mensagem deve aparecer em
+   Conversas e o painel passa a mostrar "Recebimento funcionando". Sem isso o webhook não está certo.
+3. O envio de teste só chega a quem escreveu nas últimas 24 horas ou a números cadastrados como teste
+   na Meta: se falhar para outro número, não é erro de configuração.
 
 ## Regras que o app respeita
 - Só responde por texto livre dentro de **24 horas** depois da última mensagem da pessoa. Fora disso

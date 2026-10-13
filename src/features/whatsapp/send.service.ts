@@ -1,12 +1,13 @@
 import { getSupabase, unwrap } from "../../lib/store";
 
 import { approveDraft } from "../agent/agent.service";
-import { getMessageRepository, listMessagesRepository } from "../agent/agent.repository";
+import { logOutgoingMessage } from "../agent/conversation.service";
+import { getMessageRepository, resolveDraftRepository } from "../agent/agent.repository";
 import { isCompanySuppressed } from "../compliance/suppression.service";
 import { listChannelsRepository } from "../contacts/channels.repository";
 import { consolidateChannels } from "../contacts/consolidate";
 
-import { serviceWindowOpen, syncWhatsAppInbox } from "./inbox.service";
+import { lastInboundAt, syncWhatsAppInbox, windowOpenFromInbound } from "./inbox.service";
 import { sendWhatsAppText } from "./whatsapp.client";
 
 /** Número do contato: o mesmo que escreveu para nós; senão o WhatsApp cadastrado. */
@@ -62,9 +63,7 @@ export async function sendDraftViaWhatsApp(
       throw new Error("Esta empresa pediu para não ser contatada.");
     }
 
-    const messages = await listMessagesRepository(companyId);
-
-    if (!serviceWindowOpen(messages)) {
+    if (!windowOpenFromInbound(await lastInboundAt(companyId))) {
       throw new Error(
         "A janela de 24 horas está fechada: a pessoa não escreveu no WhatsApp nas últimas 24h. Envie manualmente pelo seu WhatsApp.",
       );
@@ -84,8 +83,13 @@ export async function sendDraftViaWhatsApp(
     try {
       await approveDraft(messageId, final);
     } catch {
+      // Já foi para o contato: guarda no histórico por outro caminho e tira o
+      // rascunho da fila para ninguém reenviar.
+      await logOutgoingMessage(companyId, final, "AI").catch(() => undefined);
+      await resolveDraftRepository(messageId, { status: "DISCARDED" }).catch(() => undefined);
+
       throw new Error(
-        "A mensagem FOI enviada pelo WhatsApp, mas não conseguimos registrar no histórico. Não envie de novo: use “Já enviei (por fora)”.",
+        "A mensagem FOI enviada pelo WhatsApp, mas o funil não pôde ser atualizado. Ela está no histórico: não envie de novo.",
       );
     }
 
@@ -93,4 +97,13 @@ export async function sendDraftViaWhatsApp(
   } finally {
     sending.delete(messageId);
   }
+}
+
+/** Para quem e quando: mostrado antes do envio (nada de destino invisível). */
+export async function describeSendTarget(
+  companyId: number,
+): Promise<{ to: string | null; windowOpen: boolean }> {
+  const [to, last] = await Promise.all([replyNumber(companyId), lastInboundAt(companyId)]);
+
+  return { to, windowOpen: windowOpenFromInbound(last) };
 }
