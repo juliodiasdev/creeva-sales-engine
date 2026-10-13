@@ -1178,7 +1178,8 @@ code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-
 .visual-thumb img { height: 96px; width: auto; border-radius: 6px; border: 1px solid var(--line); display: block; }
 .visual-thumb button { position: absolute; top: 4px; right: 4px; padding: 0 6px; min-height: 0; line-height: 18px; font-size: 11px; }
 .visual-shot { max-height: 260px; width: auto; border-radius: 8px; border: 1px solid var(--line); }
-.visual-items { display: grid; gap: 12px; }
+.visual-items { display: grid; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.visual-summary { display: grid; gap: 4px; }
 .visual-item { display: grid; grid-template-columns: minmax(180px, 1.1fr) auto minmax(180px, 1.6fr); gap: 6px 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .visual-item .visual-hint { grid-column: 2 / 4; margin: 0; }
 .visual-item input[type="text"] { grid-column: 3; grid-row: 1; }

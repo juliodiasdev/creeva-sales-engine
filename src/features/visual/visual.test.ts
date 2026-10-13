@@ -22,6 +22,9 @@ import { setSetting } from "../settings/settings.service";
 import { DEFAULT_SERVICES, ensureServicesSeed, listServices, updateService } from "../services/services.service";
 import { getSupabase } from "../../lib/supabase";
 import { detectLegacyCues } from "../enrichment/website.facts";
+import { mergeCompanies } from "../duplicates/duplicates.service";
+import { exportBackup, importBackup } from "../backup/backup.service";
+import { VISUAL_CHECKLIST } from "./visual.checklist";
 import * as cheerio from "cheerio";
 
 import { runPagespeed } from "./pagespeed.client";
@@ -245,7 +248,7 @@ describe("Google PageSpeed", () => {
     const id = await newCompany();
     httpFetch.mockResolvedValueOnce(res(200, psiBody()));
 
-    const out = await analyzeSiteWithGoogle(id, vi.fn().mockRejectedValue(new Error("Configure a chave da OpenAI em Settings.")));
+    const out = await analyzeSiteWithGoogle(id, vi.fn().mockRejectedValue(new Error("Configure a chave da OpenAI em Configurações.")));
 
     expect(out.suggestion).toBeNull();
     expect(out.suggestionError).toMatch(/chave da OpenAI/);
@@ -337,18 +340,50 @@ describe("a revisão alimenta sinais, pontuação, oferta e abordagem", () => {
     expect(approaches.find((a) => a.service_key === "DESIGN_SOCIAL")!.message).toMatch(/banners ou artes de divulgação/);
 
     const improvements = await loadImprovements(id);
-    expect(improvements.find((i) => i.title === "Sem banners ou artes de divulgação")).toMatchObject({ origin: "Revisão visual" });
+    expect(improvements.find((i) => i.title === "Instagram sem banners ou artes")).toMatchObject({ origin: "Revisão visual" });
   });
 
-  it("sinais de código antigo (2 ou mais) já viram DATED_SITE, sem precisar de revisão", () => {
+  it("sinais fortes de código antigo viram LEGACY_CODE, sem precisar de revisão (e não 'visual datado')", () => {
     const oldHtml = "<html><body><center><font>Bem-vindo</font></center></body></html>";
     const facts = extractWebsiteFacts(oldHtml, { url: "https://a.com.br", finalUrl: "https://a.com.br/", httpStatus: 200 });
     const signals = deriveSignals({ website: "https://a.com.br", rating: null, reviews_count: null }, facts, 2026);
-    const dated = signals.find((s) => s.type === "DATED_SITE")!;
+    const legacy = signals.find((s) => s.type === "LEGACY_CODE")!;
 
-    expect(dated).toMatchObject({ source: "WEBSITE" });
-    expect(dated.evidence).toMatch(/doctype/);
-    expect(dated.evidence).toMatch(/tags obsoletas/);
+    expect(legacy).toMatchObject({ source: "WEBSITE" });
+    expect(legacy.evidence).toMatch(/doctype/);
+    expect(legacy.evidence).toMatch(/tags de formatação obsoletas/);
+    expect(signals.map((s) => s.type)).not.toContain("DATED_SITE");
+  });
+
+  it("Instagram e site têm sinais separados: um não esconde nem contamina o outro", () => {
+    const only = (answers: Record<string, [string, string][]>) =>
+      deriveSignals({ website: "https://a.com.br", rating: null, reviews_count: null }, null, 2026, Object.entries(answers).map(([target, list]) => ({
+        target: target as "INSTAGRAM" | "SITE", answers: list.map(([id, status]) => ({ id, status: status as "OK" | "WARN" | "FAIL", note: "nota" })), metrics: null, summary: null, source: "MANUAL" as const, reviewedAt: "",
+      })));
+    const types = (list: ReturnType<typeof only>) => list.map((s) => s.type).filter((t) => /BANNER/.test(t));
+
+    // só o site olhado: nada é dito sobre o Instagram
+    expect(types(only({ SITE: [["hero", "FAIL"]] }))).toEqual(["WEAK_SITE_BANNER"]);
+    // Instagram com artes antigas + site sem banner: os dois aparecem, cada um com a sua evidência
+    const both = only({ INSTAGRAM: [["banners", "WARN"]], SITE: [["hero", "FAIL"]] });
+    expect(types(both).sort()).toEqual(["OLD_BANNERS", "WEAK_SITE_BANNER"]);
+    expect(both.find((s) => s.type === "OLD_BANNERS")!.evidence).toBe("Instagram com artes antigas ou amadoras (revisão visual): nota.");
+    expect(both.find((s) => s.type === "WEAK_SITE_BANNER")!.evidence).toBe("Banner principal do site ausente (revisão visual): nota.");
+    // Instagram bom + banner do site fraco: nenhum sinal sobre Instagram
+    expect(types(only({ INSTAGRAM: [["banners", "OK"]], SITE: [["hero", "WARN"]] }))).toEqual(["WEAK_SITE_BANNER"]);
+  });
+
+  it("a observação da abordagem cita só o que foi visto: Instagram para banners do Instagram, site para o site", async () => {
+    const id = await newCompany();
+    const html = '<!doctype html><html><head><title>Aurora</title><meta name="viewport" content="width=device-width"></head><body><a href="https://wa.me/5565992250342">Agende agora</a><form></form><p>© 2026 Aurora</p></body></html>';
+
+    await enrichCompany(id, vi.fn().mockResolvedValue(extractWebsiteFacts(html, { url: "https://lojaaurora.com.br", finalUrl: "https://lojaaurora.com.br/", httpStatus: 200 })));
+    await saveVisualReview(id, "SITE", { source: "MANUAL", answers: [{ id: "hero", status: "FAIL" }] });
+
+    const messages = (await listApproachesRepository(id)).map((a) => a.message).join("\n");
+
+    expect(messages).toMatch(/banner principal do site de vocês/);
+    expect(messages).not.toMatch(/Instagram de vocês/);
   });
 
   it("banner só 'fraco' vira OLD_BANNERS; apagar a revisão tira os sinais", async () => {
@@ -396,5 +431,77 @@ describe("visão geral da revisão", () => {
     const id = await newCompany({ website: undefined, name: "Sem Nada", phone: "(65) 3000-1234" });
 
     expect((await loadVisualOverview(id)).targets).toEqual([]);
+  });
+});
+
+describe("correções da revisão", () => {
+  it("medir o site não muda a data da revisão; apagar também não", async () => {
+    const id = await newCompany();
+    await saveVisualReview(id, "SITE", { source: "MANUAL", answers: [{ id: "design", status: "WARN" }] });
+    const before = (await listVisualReviews(id))[0].reviewedAt;
+
+    await new Promise((r) => setTimeout(r, 15));
+    httpFetch.mockResolvedValueOnce(res(200, psiBody()));
+    await analyzeSiteWithGoogle(id, vi.fn().mockRejectedValue(new Error("sem IA")));
+
+    const after = (await listVisualReviews(id))[0];
+    expect(after.reviewedAt).toBe(before);
+    expect(after.metrics!.performance).toBe(42);
+  });
+
+  it("chave do Google recusada: o erro continua sendo 'ative a API', mesmo se a 2ª tentativa der limite de uso", async () => {
+    await setSetting("google_api_key", "KEY");
+    httpFetch.mockResolvedValueOnce(res(403, { error: { message: "disabled" } })).mockResolvedValueOnce(res(429, {}));
+
+    await expect(runPagespeed("https://a.com.br")).rejects.toThrow(/PageSpeed Insights API ativada/);
+  });
+
+  it("limite de uso sem chave manda configurar em 'Configurações'; com chave não manda configurar nada", async () => {
+    httpFetch.mockResolvedValueOnce(res(429, {}));
+    await expect(runPagespeed("https://a.com.br")).rejects.toThrow(/em Configurações/);
+
+    await setSetting("google_api_key", "KEY");
+    httpFetch.mockResolvedValueOnce(res(429, {}));
+    await expect(runPagespeed("https://a.com.br")).rejects.not.toThrow(/Configurações/);
+  });
+
+  it("o resumo da IA cabe em até 400 caracteres", async () => {
+    const id = await newCompany();
+    const chat = vi.fn().mockResolvedValue({ model: "m", json: { answers: [{ id: "banners", status: "OK" }], summary: "x".repeat(900) } });
+
+    expect((await suggestVisualAnswers(id, "INSTAGRAM", [IMG], chat)).summary).toHaveLength(400);
+  });
+
+  it("'não consegui confirmar' não existe mais como resposta de meio-termo", () => {
+    expect(JSON.stringify(VISUAL_CHECKLIST)).not.toMatch(/confirmar/i);
+  });
+
+  it("mesclar duplicados leva as revisões visuais para o principal (o alvo que o principal já tem prevalece)", async () => {
+    const master = await newCompany();
+    const dup = await newCompany({ name: "Aurora Moda Ltda", phone: "(65) 3999-1234", website: "https://aurora-moda.com.br" });
+
+    await saveVisualReview(master, "INSTAGRAM", { source: "MANUAL", answers: [{ id: "banners", status: "OK" }] });
+    await saveVisualReview(dup, "INSTAGRAM", { source: "MANUAL", answers: [{ id: "banners", status: "FAIL" }] });
+    await saveVisualReview(dup, "WHATSAPP", { source: "MANUAL", answers: [{ id: "photo", status: "FAIL" }] });
+
+    await mergeCompanies(master, dup);
+
+    const reviews = await listVisualReviews(master);
+    expect(reviews.map((r) => r.target).sort()).toEqual(["INSTAGRAM", "WHATSAPP"]);
+    expect(reviews.find((r) => r.target === "INSTAGRAM")!.answers[0].status).toBe("OK");
+  });
+
+  it("restaurar um backup antigo completa o catálogo de serviços", async () => {
+    await newCompany();
+    const file = await exportBackup();
+    const old = JSON.parse(JSON.stringify(file));
+
+    old.schemaVersion = 12;
+    old.tables.services = old.tables.services.filter((s: { key: string }) => s.key !== "DESIGN_SOCIAL");
+    delete old.tables.visual_reviews;
+
+    await importBackup(old);
+
+    expect((await listServices()).map((s) => s.key)).toContain("DESIGN_SOCIAL");
   });
 });

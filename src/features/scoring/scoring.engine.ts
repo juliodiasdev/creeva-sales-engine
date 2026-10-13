@@ -34,6 +34,8 @@ const NEED_WEIGHTS: Record<SignalType, number> = {
   WEAK_SOCIAL_PROFILE: 4,
   SLOW_SITE: 4,
   OLD_BANNERS: 3,
+  WEAK_SITE_BANNER: 3,
+  LEGACY_CODE: 4,
   AUTOMATION_GAP: 3,
 };
 

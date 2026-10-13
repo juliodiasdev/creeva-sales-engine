@@ -4,9 +4,10 @@ import type { VisualAnswer, VisualStatus, VisualTarget } from "./visual.checklis
 const STATUSES: VisualStatus[] = ["OK", "WARN", "FAIL"];
 
 export const MAX_NOTE = 160;
+export const MAX_SUMMARY = 400;
 
 /** Texto de observação: uma linha, sem marcação, tamanho limitado. */
-export function cleanNote(value: unknown): string | undefined {
+export function cleanNote(value: unknown, max = MAX_NOTE): string | undefined {
   if (typeof value !== "string") return undefined;
 
   const text = value
@@ -14,7 +15,7 @@ export function cleanNote(value: unknown): string | undefined {
     .replace(/[\u0000-\u001f\u007f<>]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, MAX_NOTE);
+    .slice(0, max);
 
   return text || undefined;
 }

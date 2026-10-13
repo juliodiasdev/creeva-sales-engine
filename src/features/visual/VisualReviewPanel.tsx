@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ConfirmButton } from "../../components/ConfirmButton";
+
 import { ErrorMessage } from "../../components/ErrorMessage";
 import { errorMessage, formatDateTime } from "../../lib/format";
 import { fileToJpegDataUrl } from "../../lib/image";
@@ -40,8 +42,8 @@ const STATUS_CLASS: Record<VisualStatus, string> = {
 
 type Draft = Record<string, { status?: VisualStatus; note: string; ai?: boolean }>;
 
-const toDraft = (answers: VisualAnswer[]): Draft =>
-  Object.fromEntries(answers.map((a) => [a.id, { status: a.status, note: a.note ?? "" }]));
+const toDraft = (answers: VisualAnswer[], ai: boolean): Draft =>
+  Object.fromEntries(answers.map((a) => [a.id, { status: a.status, note: a.note ?? "", ai }]));
 
 const HOW_TO: Record<VisualTarget, string> = {
   INSTAGRAM:
@@ -85,12 +87,19 @@ function TargetCard({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const form = useRef<HTMLDivElement>(null);
 
   const items = VISUAL_CHECKLIST[target];
   const answered = review?.answers.length ?? 0;
 
+  // O foco entra no formulário para o Ctrl+V de um print funcionar logo ao abrir.
+  useEffect(() => {
+    if (open) form.current?.focus();
+  }, [open]);
+
   function start() {
-    setDraft(toDraft(review?.answers ?? []));
+    // Reabrir mantém a origem: o que a IA sugeriu e você conferiu continua marcado assim até você mudar o item.
+    setDraft(toDraft(review?.answers ?? [], review?.source === "AI_ASSISTED"));
     setSummary(review?.summary ?? null);
     setImages([]);
     setShot(null);
@@ -116,17 +125,24 @@ function TargetCard({
   }
 
   function applySuggestion(answers: VisualAnswer[], text: string | null) {
+    const kept = answers.filter((a) => draft[a.id]?.status).length;
+
     setDraft((prev) => {
       const next = { ...prev };
 
+      // O que você já respondeu nunca é sobrescrito: a IA só preenche o que está em branco.
       for (const a of answers) {
+        if (prev[a.id]?.status) continue;
+
         next[a.id] = { status: a.status, note: a.note ?? "", ai: true };
       }
 
       return next;
     });
-    setSummary(text);
-    setNotice("Sugestão da IA aplicada. Confira cada item antes de salvar: você decide.");
+    setSummary((prev) => prev ?? text);
+    setNotice(
+      `Sugestão da IA aplicada nos itens em branco${kept > 0 ? ` (${kept} item(ns) que você já respondeu foram mantidos)` : ""}. Confira cada item antes de salvar: você decide.`,
+    );
   }
 
   async function suggest() {
@@ -240,6 +256,8 @@ function TargetCard({
 
       {open && (
         <div
+          ref={form}
+          tabIndex={-1}
           className="visual-form"
           onPaste={(e) => {
             const files = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
@@ -314,7 +332,7 @@ function TargetCard({
           {notice && <p className="notice small">{notice}</p>}
           <ErrorMessage message={error} />
 
-          <div className="visual-items">
+          <fieldset className="visual-items" disabled={busy !== ""}>
             {items.map((item) => {
               const value = draft[item.id];
 
@@ -336,7 +354,7 @@ function TargetCard({
                         onClick={() =>
                           setDraft((d) => ({
                             ...d,
-                            [item.id]: { note: d[item.id]?.note ?? "", status: d[item.id]?.status === status ? undefined : status },
+                            [item.id]: { note: d[item.id]?.note ?? "", status: d[item.id]?.status === status ? undefined : status, ai: false },
                           }))
                         }
                       >
@@ -346,7 +364,7 @@ function TargetCard({
                   </div>
 
                   <p className="muted small visual-hint">
-                    {value?.status ? item.hints[value.status] : "Escolha uma opção (passe o mouse para ver o que cada uma significa)."}
+                    {value?.status ? item.hints[value.status] : "Sem certeza? Deixe em branco: o item fica 'não avaliado' e não entra na nota."}
                     {value?.ai ? " · sugerido pela IA" : ""}
                   </p>
 
@@ -356,13 +374,24 @@ function TargetCard({
                     placeholder="O que você viu (opcional)"
                     value={value?.note ?? ""}
                     onChange={(e) =>
-                      setDraft((d) => ({ ...d, [item.id]: { ...d[item.id], note: e.target.value } }))
+                      setDraft((d) => ({ ...d, [item.id]: { ...d[item.id], note: e.target.value, ai: false } }))
                     }
                   />
                 </div>
               );
             })}
-          </div>
+          </fieldset>
+
+          <label className="visual-summary">
+            <span className="muted small">Resumo da revisão (opcional, você pode editar ou apagar)</span>
+            <textarea
+              rows={2}
+              maxLength={400}
+              value={summary ?? ""}
+              disabled={busy !== ""}
+              onChange={(e) => setSummary(e.target.value || null)}
+            />
+          </label>
 
           <div className="outreach-actions">
             <button
@@ -378,9 +407,15 @@ function TargetCard({
             </button>
 
             {answered > 0 && (
-              <button type="button" className="secondary" disabled={busy !== ""} onClick={() => void clear()}>
+              <ConfirmButton
+                secondary
+                disabled={busy !== ""}
+                warning="Apagar as respostas e o resumo desta revisão?"
+                confirmLabel="Apagar"
+                onConfirm={() => void clear()}
+              >
                 Apagar revisão
-              </button>
+              </ConfirmButton>
             )}
           </div>
         </div>
@@ -407,6 +442,7 @@ export function VisualReviewPanel({
   const load = useCallback(async () => {
     try {
       setOverview(await loadVisualOverview(companyId));
+      setError("");
     } catch (err) {
       setError(errorMessage(err, "Erro ao carregar a revisão visual."));
     }
@@ -416,7 +452,18 @@ export function VisualReviewPanel({
     void load();
   }, [load]);
 
-  if (!overview) return <ErrorMessage message={error} />;
+  if (!overview) {
+    return (
+      <>
+        <ErrorMessage message={error} />
+        {error && (
+          <button type="button" className="secondary" onClick={() => void load()}>
+            Tentar de novo
+          </button>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="ficha-group">

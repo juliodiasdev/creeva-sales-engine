@@ -335,7 +335,7 @@ export async function searchPlaces(
 
   if (!apiKey) {
     throw new Error(
-      "Configure a chave da Google Places API em Settings.",
+      "Configure a chave da Google Places API em Configurações.",
     );
   }
 

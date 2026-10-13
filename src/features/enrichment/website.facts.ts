@@ -165,6 +165,27 @@ export function detectTools($: cheerio.CheerioAPI): DetectedTool[] {
   return [...found.values()];
 }
 
+/** Sinais FORTES de código antigo; os demais são fracos e sozinhos não bastam. */
+const STRONG_CUES = new Set([
+  "sem declaração de documento moderna (doctype)",
+  "doctype antigo (HTML 4/XHTML)",
+  "usa Flash",
+  "jQuery antigo (versão 1.x/2.x)",
+  "tags obsoletas de movimento ou quadros (marquee, blink, frameset)",
+]);
+
+/**
+ * NONE = nenhum sinal · MINOR = um sinal ou só sinais fracos · STRONG = um sinal forte
+ * junto de outro, ou dois fortes. Só STRONG vira problema; MINOR é atenção.
+ */
+export function legacyLevel(cues: string[]): "NONE" | "MINOR" | "STRONG" {
+  if (cues.length === 0) return "NONE";
+
+  const strong = cues.filter((c) => STRONG_CUES.has(c)).length;
+
+  return strong >= 2 || (strong >= 1 && cues.length >= 2) ? "STRONG" : "MINOR";
+}
+
 /** Sinais objetivos de que o código da página é antigo. Não julga o visual. */
 export function detectLegacyCues(html: string, $: cheerio.CheerioAPI): string[] {
   const cues: string[] = [];
@@ -176,19 +197,24 @@ export function detectLegacyCues(html: string, $: cheerio.CheerioAPI): string[] 
     cues.push("doctype antigo (HTML 4/XHTML)");
   }
 
+  // Tabela de dados simples não é layout: precisa de tabela dentro de tabela com atributos de layout.
   const tableLayout =
-    $("table[width], table[bgcolor], table[cellpadding], table[cellspacing]").length >= 2 ||
+    ($("table table").length > 0 && $("table[width], table[bgcolor], table[cellpadding], table[cellspacing]").length > 0) ||
     $("table table table").length > 0;
 
   if (tableLayout) cues.push("layout montado com tabelas");
 
-  if ($("font, center, marquee, blink, frameset, frame, big, strike").length > 0) {
-    cues.push("tags obsoletas (font, center, marquee…)");
+  if ($("marquee, blink, frameset, frame").length > 0) {
+    cues.push("tags obsoletas de movimento ou quadros (marquee, blink, frameset)");
   }
 
+  if ($("font, center, big, strike").length > 0) {
+    cues.push("tags de formatação obsoletas (font, center…)");
+  }
+
+  // Só atributos de verdade (src/data/value): ".swf" em texto ou em script não conta.
   if (
-    $('object[type*="shockwave"], embed[type*="shockwave"], embed[src$=".swf"], object[data$=".swf"]').length > 0 ||
-    /\.swf(["'?\s])/i.test(html)
+    $('object[type*="shockwave"], embed[type*="shockwave"], embed[src*=".swf"], object[data*=".swf"], param[value*=".swf"]').length > 0
   ) {
     cues.push("usa Flash");
   }
@@ -207,7 +233,18 @@ export function detectLegacyCues(html: string, $: cheerio.CheerioAPI): string[] 
 }
 
 function imageStats($: cheerio.CheerioAPI) {
-  const imgs = $("img").toArray();
+  // Imagem decorativa (alt vazio explícito, role=presentation, aria-hidden) não entra na conta.
+  const imgs = $("img")
+    .toArray()
+    .filter((el) => {
+      const img = $(el);
+
+      return !(
+        img.attr("alt") === "" ||
+        /^(presentation|none)$/i.test(img.attr("role") ?? "") ||
+        img.attr("aria-hidden") === "true"
+      );
+    });
 
   let withAlt = 0;
   let optimized = 0;

@@ -52,7 +52,7 @@ export async function listVisualReviewsRepository(
 
 export async function upsertVisualReviewRepository(
   companyId: number,
-  review: Omit<VisualReview, "reviewedAt">,
+  review: Omit<VisualReview, "reviewedAt"> & { reviewedAt?: string },
 ): Promise<void> {
   unwrap(
     await getSupabase()
@@ -65,9 +65,37 @@ export async function upsertVisualReviewRepository(
           metrics: review.metrics ? JSON.stringify(review.metrics) : null,
           summary: review.summary,
           source: review.source,
-          reviewed_at: nowIso(),
+          reviewed_at: review.reviewedAt ?? nowIso(),
         },
         { onConflict: "company_id,target" },
       ),
   );
+}
+
+/**
+ * Passa as revisões de `fromCompanyId` para `toCompanyId` (mesclagem de duplicados).
+ * Só move o alvo que o destino ainda não tem; o do destino prevalece.
+ */
+export async function moveVisualReviewsRepository(
+  fromCompanyId: number,
+  toCompanyId: number,
+): Promise<void> {
+  const [from, to] = await Promise.all([
+    listVisualReviewsRepository(fromCompanyId),
+    listVisualReviewsRepository(toCompanyId),
+  ]);
+
+  const have = new Set(to.map((r) => r.target));
+
+  for (const review of from) {
+    if (have.has(review.target)) continue;
+
+    unwrap(
+      await getSupabase()
+        .from("visual_reviews")
+        .update({ company_id: toCompanyId })
+        .eq("company_id", fromCompanyId)
+        .eq("target", review.target),
+    );
+  }
 }

@@ -30,11 +30,11 @@ const pct = (score: number | null | undefined) =>
     ? Math.round(score * 100)
     : null;
 
-function describeFailure(status: number, body: LighthouseResponse): string {
+function describeFailure(status: number, body: LighthouseResponse, hasKey = false): string {
   const detail = body.error?.message ?? "";
 
   if (status === 429) {
-    return "O Google PageSpeed atingiu o limite de uso. Tente de novo em alguns minutos (ou configure a chave do Google em Settings).";
+    return `O Google PageSpeed atingiu o limite de uso. Tente de novo em alguns minutos${hasKey ? "." : " (ou configure a chave do Google em Configurações)."}`;
   }
 
   if (status === 403) {
@@ -84,9 +84,11 @@ export async function runPagespeed(rawUrl: string): Promise<PagespeedResult> {
   const key = (await getSetting("google_api_key")) || null;
 
   let response = await call(url, key);
+  let keyRefused = false;
 
   // Chave do Places geralmente é restrita a outras APIs: tenta uma vez sem chave.
   if (response.status === 403 && key) {
+    keyRefused = true;
     response = await call(url, null);
   }
 
@@ -100,7 +102,10 @@ export async function runPagespeed(rawUrl: string): Promise<PagespeedResult> {
     // corpo não-JSON
   }
 
-  if (!response.ok) throw new Error(describeFailure(response.status, body));
+  if (!response.ok) {
+    // Se a chave foi recusada, o motivo real é a API não ativada, mesmo que a 2ª tentativa tenha dado outro erro.
+    throw new Error(describeFailure(keyRefused ? 403 : response.status, body, !!key));
+  }
 
   const lh = body.lighthouseResult;
 

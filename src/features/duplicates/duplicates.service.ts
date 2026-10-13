@@ -1,3 +1,4 @@
+import { moveVisualReviewsRepository } from "../visual/visual.repository";
 import { isCompanySuppressed } from "../compliance/suppression.service";
 import { confirmOptOut } from "../agent/conversation.service";
 import {
@@ -219,6 +220,9 @@ export async function mergeCompanies(
         .eq("company_id", duplicateId),
     );
   }
+
+  // revisões visuais (trabalho feito à mão) não se perdem: passam para o principal
+  await moveVisualReviewsRepository(duplicateId, masterId);
 
   // sinais são recalculados no próximo enriquecimento
   unwrap(

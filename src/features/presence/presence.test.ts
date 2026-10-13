@@ -110,7 +110,7 @@ describe("assessPresence", () => {
     expect(r.score).toBeGreaterThanOrEqual(85);
     expect(r.strengths.length).toBeGreaterThan(0);
     // 20% da nota depende da revisão visual (Instagram/site), ainda não feita.
-    expect(r.confidence).toBeGreaterThanOrEqual(0.8);
+    expect(r.confidence).toBeGreaterThanOrEqual(0.75);
     expect(r.confidence).toBeLessThan(0.85);
     expect(r.pending).toEqual(expect.arrayContaining(["Revisão visual: Instagram", "Revisão visual: Visual do site"]));
     expect(r.position).toMatch(/Presença avançada: nota \d+\/100/);
@@ -173,7 +173,25 @@ describe("site antigo ou novo", () => {
     expect(legacy.detail).toMatch(/tabelas/);
     expect(legacy.detail).toMatch(/tags obsoletas/);
     expect(legacy.detail).toMatch(/jQuery antigo/);
-    expect(r.offers.find((o) => o.service === "SITE_LOJA")!.reasons.join(" ")).toMatch(/site antigo/);
+    expect(r.gaps.map((g) => g.id)).toContain("site.legacy");
+  });
+
+  it("um sinal fraco sozinho é só atenção; tabela de dados simples não é layout antigo", () => {
+    const dataTable = `<!doctype html><html><head><title>x</title><meta name="viewport" content="width=device-width"></head><body><table width="100%" cellspacing="0"><tr><td>Plano</td><td>Preço</td></tr></table><table width="50%"><tr><td>a</td></tr></table><center>oi</center></body></html>`;
+    const r = assessPresence({ company: company({ website: "https://a.com.br" }), channels: [], facts: facts(dataTable), now: NOW });
+    const legacy = dim(r, "SITE").checks.find((c) => c.id === "site.legacy")!;
+
+    expect(legacy.status).toBe("WARN");
+    expect(legacy.detail).toMatch(/tags de formatação obsoletas/);
+    expect(legacy.detail).not.toMatch(/tabelas/);
+    expect(r.gaps.find((g) => g.id === "site.legacy")!.status).toBe("WARN");
+  });
+
+  it("imagens decorativas não contam; sem imagens de conteúdo no HTML é 'não medido', não problema", () => {
+    const only = `<!doctype html><html><head><title>x</title></head><body><img src="/a.png" alt=""><img src="/b.png" role="presentation"></body></html>`;
+    const r = assessPresence({ company: company({ website: "https://a.com.br" }), channels: [], facts: facts(only), now: NOW });
+
+    expect(dim(r, "SITE").checks.find((c) => c.id === "site.images")!.status).toBe("UNKNOWN");
   });
 
   it("site moderno não é acusado de antigo", () => {

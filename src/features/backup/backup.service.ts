@@ -1,3 +1,4 @@
+import { ensureServicesSeed } from "../services/services.service";
 import { fetchAllPages, getSupabase, unwrap } from "../../lib/store";
 
 import {
@@ -154,5 +155,7 @@ export async function importBackup(raw: unknown): Promise<void> {
     }
   }
 
+  // Backup de versão anterior pode não ter serviços criados depois: o catálogo é completado.
+  await ensureServicesSeed();
   await resetSequences();
 }

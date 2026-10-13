@@ -1,5 +1,6 @@
 import { isGenericHost } from "../../lib/normalize";
 import type { Company } from "../companies/company.types";
+import { legacyLevel } from "../enrichment/website.facts";
 import type { WebsiteFacts } from "../enrichment/website.facts";
 import { automationGaps } from "../automation/automation.engine";
 import type { AutomationReport } from "../automation/automation.engine";
@@ -19,9 +20,11 @@ export type SignalType =
   | "NO_MOBILE_SIGNAL"
   // Vindos do código do site, do Google PageSpeed e da revisão visual (Instagram, WhatsApp, site).
   | "DATED_SITE"
+  | "LEGACY_CODE"
   | "SLOW_SITE"
   | "NO_BANNERS"
   | "OLD_BANNERS"
+  | "WEAK_SITE_BANNER"
   | "WEAK_SOCIAL_PROFILE"
   | "AUTOMATION_GAP";
 
@@ -198,48 +201,63 @@ function deriveVisualSignals(
   const answer = (target: VisualTarget, id: string) =>
     reviews.find((r) => r.target === target)?.answers.find((a) => a.id === id);
 
-  const noted = (a: { note?: string } | undefined) => (a?.note ? `: ${a.note}` : ".");
+  const noted = (a: { note?: string } | undefined) => (a?.note ? `: ${a.note}.` : ".");
 
+  // Instagram e site são alvos diferentes: cada um tem o seu sinal, sem um esconder o outro.
   const igBanners = answer("INSTAGRAM", "banners");
-  const siteHero = answer("SITE", "hero");
 
-  if (igBanners?.status === "FAIL" || siteHero?.status === "FAIL") {
+  if (igBanners?.status === "FAIL") {
     signals.push({
       type: "NO_BANNERS",
       value: null,
-      evidence: [
-        igBanners?.status === "FAIL" ? `Instagram sem banners ou artes de divulgação (revisão visual)${noted(igBanners)}` : null,
-        siteHero?.status === "FAIL" ? `Site sem banner principal (revisão visual)${noted(siteHero)}` : null,
-      ].filter(Boolean).join(" "),
+      evidence: `Instagram sem banners ou artes de divulgação (revisão visual)${noted(igBanners)}`,
       source: "VISUAL_REVIEW",
       confidence: 0.8,
     });
-  } else if (igBanners?.status === "WARN" || siteHero?.status === "WARN") {
+  } else if (igBanners?.status === "WARN") {
     signals.push({
       type: "OLD_BANNERS",
       value: null,
-      evidence: [
-        igBanners?.status === "WARN" ? `Instagram com artes antigas ou amadoras (revisão visual)${noted(igBanners)}` : null,
-        siteHero?.status === "WARN" ? `Banner principal do site fraco ou genérico (revisão visual)${noted(siteHero)}` : null,
-      ].filter(Boolean).join(" "),
+      evidence: `Instagram com artes antigas ou amadoras (revisão visual)${noted(igBanners)}`,
       source: "VISUAL_REVIEW",
       confidence: 0.7,
     });
   }
 
-  const cues = facts && !facts.error ? (facts.legacyCues ?? []) : [];
+  const siteHero = answer("SITE", "hero");
+
+  if (siteHero && siteHero.status !== "OK") {
+    signals.push({
+      type: "WEAK_SITE_BANNER",
+      value: siteHero.status,
+      evidence: `Banner principal do site ${siteHero.status === "FAIL" ? "ausente" : "fraco ou genérico"} (revisão visual)${noted(siteHero)}`,
+      source: "VISUAL_REVIEW",
+      confidence: siteHero.status === "FAIL" ? 0.8 : 0.7,
+    });
+  }
+
   const design = answer("SITE", "design");
 
-  if (cues.length >= 2 || design?.status === "FAIL") {
+  if (design?.status === "FAIL") {
     signals.push({
       type: "DATED_SITE",
       value: null,
-      evidence: [
-        cues.length >= 2 ? `Sinais de site antigo no código: ${cues.join("; ")}.` : null,
-        design?.status === "FAIL" ? `Aparência do site datada (revisão visual)${noted(design)}` : null,
-      ].filter(Boolean).join(" "),
-      source: design?.status === "FAIL" ? "VISUAL_REVIEW" : "WEBSITE",
-      confidence: design?.status === "FAIL" ? 0.8 : 0.7,
+      evidence: `Aparência do site datada (revisão visual)${noted(design)}`,
+      source: "VISUAL_REVIEW",
+      confidence: 0.8,
+    });
+  }
+
+  // Código antigo é medido no HTML: só sinais fortes viram sinal (tabela de dados ou <center> sozinhos não).
+  const cues = facts && !facts.error ? (facts.legacyCues ?? []) : [];
+
+  if (legacyLevel(cues) === "STRONG") {
+    signals.push({
+      type: "LEGACY_CODE",
+      value: String(cues.length),
+      evidence: `Sinais de código antigo na página inicial: ${cues.join("; ")}.`,
+      source: "WEBSITE",
+      confidence: 0.7,
     });
   }
 

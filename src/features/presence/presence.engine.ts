@@ -1,4 +1,5 @@
 import type { Company } from "../companies/company.types";
+import { legacyLevel } from "../enrichment/website.facts";
 import type { WebsiteFacts } from "../enrichment/website.facts";
 import type { ServiceKey } from "../services/services.service";
 import { isGenericHost, normalizeDomain } from "../../lib/normalize";
@@ -294,23 +295,23 @@ export function assessPresence(input: Input): PresenceReport {
           f.hasPrivacyLink === undefined ? "UNKNOWN" : f.hasPrivacyLink ? "OK" : "WARN",
           f.hasPrivacyLink === undefined ? unknown("leitura antiga") : f.hasPrivacyLink ? "Link encontrado." : "Sem link de privacidade.", 1, "SITE_LOJA"),
         check("site.legacy", "SITE", "Tecnologia do site (código antigo?)",
-          f.legacyCues === undefined ? "UNKNOWN" : f.legacyCues.length === 0 ? "OK" : f.legacyCues.length === 1 ? "WARN" : "FAIL",
+          f.legacyCues === undefined ? "UNKNOWN" : { NONE: "OK", MINOR: "WARN", STRONG: "FAIL" }[legacyLevel(f.legacyCues)] as CheckStatus,
           f.legacyCues === undefined
             ? unknown("leitura antiga; refaça o enriquecimento")
             : f.legacyCues.length === 0
               ? "Nenhum sinal de código antigo."
-              : `Sinais de site antigo: ${f.legacyCues.join("; ")}.`,
+              : `Sinais de código antigo na página inicial: ${f.legacyCues.join("; ")}.`,
           4, "SITE_LOJA"),
         check("site.images", "SITE", "Imagens da página inicial",
-          f.images === undefined
+          f.images === undefined || f.images.total === 0
             ? "UNKNOWN"
-            : f.images.total === 0 || f.images.optimized / f.images.total < 0.5 || f.images.withAlt / f.images.total < 0.5
+            : f.images.optimized / f.images.total < 0.5 || f.images.withAlt / f.images.total < 0.5
               ? "WARN"
               : "OK",
           f.images === undefined
             ? unknown("leitura antiga; refaça o enriquecimento")
             : f.images.total === 0
-              ? "Nenhuma imagem encontrada no código da página inicial (pode ser carregada por JavaScript)."
+              ? unknown("nenhuma imagem de conteúdo no HTML da página inicial (pode ser carregada por JavaScript)")
               : `${f.images.total} imagem(ns): ${f.images.withAlt} com texto alternativo, ${f.images.optimized} com formato/carregamento moderno.`,
           1, "SITE_LOJA"),
       );

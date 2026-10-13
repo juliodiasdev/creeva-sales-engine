@@ -58,7 +58,7 @@ export async function describeOpenAiError(
   } else if (response.status === 429) {
     hint = "Limite de requisições excedido. Tente novamente em instantes.";
   } else if (response.status === 404 || code === "model_not_found") {
-    hint = "Modelo indisponível para a sua conta. Troque o modelo em Settings.";
+    hint = "Modelo indisponível para a sua conta. Troque o modelo em Configurações.";
   } else if (response.status === 403) {
     hint = "Acesso negado para este modelo/projeto.";
   }
@@ -86,7 +86,7 @@ async function postChatJson(
   const apiKey = await getSetting("openai_api_key");
 
   if (!apiKey) {
-    throw new Error("Configure a chave da OpenAI em Settings.");
+    throw new Error("Configure a chave da OpenAI em Configurações.");
   }
 
   const model = (await getSetting("openai_model")) ?? "gpt-4o-mini";

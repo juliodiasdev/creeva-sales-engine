@@ -174,7 +174,14 @@ export function FichaPanel({
 
   return (
     <>
-      <PresencePanel companyId={companyId} onChanged={onChanged} />
+      <PresencePanel
+        companyId={companyId}
+        onChanged={() => {
+          // Revisão visual muda sinais e melhorias: a ficha também se atualiza.
+          void load();
+          onChanged?.();
+        }}
+      />
 
     <section className="panel ficha">
       <div className="panel-title">

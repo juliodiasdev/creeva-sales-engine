@@ -37,11 +37,13 @@ const OBSERVATION: Partial<Record<SignalType, string>> = {
   NO_CLEAR_CTA: "não achei um botão claro de agendamento ou orçamento no site",
   NO_FORM: "o site não tem um formulário de contato",
   NO_WHATSAPP: "não vi um botão de WhatsApp no site",
-  NO_BANNERS: "não encontrei banners ou artes de divulgação nas redes de vocês",
-  OLD_BANNERS: "as artes de divulgação de vocês parecem ter ficado para trás",
+  NO_BANNERS: "não encontrei banners ou artes de divulgação no Instagram de vocês",
+  OLD_BANNERS: "as artes de divulgação do Instagram de vocês parecem ter ficado para trás",
+  WEAK_SITE_BANNER: "o banner principal do site de vocês poderia comunicar melhor a oferta",
   DATED_SITE: "o site parece ter ficado com o visual de alguns anos atrás",
-  SLOW_SITE: "o site demora para carregar no celular",
-  WEAK_SOCIAL_PROFILE: "o perfil de vocês nas redes poderia passar mais profissionalismo",
+  LEGACY_CODE: "o site parece usar uma estrutura técnica antiga",
+  SLOW_SITE: "o teste do Google indicou que o site demora para carregar no celular",
+  WEAK_SOCIAL_PROFILE: "o perfil de vocês no Instagram ou no WhatsApp poderia passar mais profissionalismo",
 };
 
 const OFFER: Record<ServiceKey, { angle: string; pitch: string }> = {

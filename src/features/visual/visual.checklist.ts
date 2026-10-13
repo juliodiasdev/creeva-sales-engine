@@ -128,7 +128,7 @@ export const VISUAL_CHECKLIST: Record<VisualTarget, ChecklistItem[]> = {
       question: "O número usa o WhatsApp Business (perfil comercial), e não o pessoal?",
       hints: {
         OK: "Perfil comercial (WhatsApp Business)",
-        WARN: "Não consegui confirmar",
+        WARN: "Perfil comercial, mas com poucos dados preenchidos",
         FAIL: "WhatsApp pessoal, sem perfil comercial",
       },
       weight: 3,
