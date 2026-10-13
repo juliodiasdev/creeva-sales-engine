@@ -64,6 +64,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   MANUAL: "Cadastro manual",
   AI_SEARCH: "Busca com IA (aprovado por você)",
   CNPJ: "CNPJ",
+  VISUAL_REVIEW: "Revisão visual (conferida por você)",
 };
 
 export const SIGNAL_LABEL: Record<string, string> = {
@@ -77,6 +78,11 @@ export const SIGNAL_LABEL: Record<string, string> = {
   BROKEN_LINK: "Site fora do ar",
   WEAK_CONVERSION_PATH: "Caminho até o contato fraco",
   NO_MOBILE_SIGNAL: "Pode não funcionar bem no celular",
+  DATED_SITE: "Site com cara de antigo",
+  SLOW_SITE: "Site lento no celular",
+  NO_BANNERS: "Sem banners ou artes de divulgação",
+  OLD_BANNERS: "Banners antigos ou amadores",
+  WEAK_SOCIAL_PROFILE: "Perfil fraco nas redes",
 };
 
 export const SCORE_DIMENSION_LABEL: Record<string, string> = {

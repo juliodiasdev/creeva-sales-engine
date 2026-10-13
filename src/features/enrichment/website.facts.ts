@@ -38,6 +38,13 @@ export interface WebsiteFacts {
   sellsOnline?: boolean;
   /** A página sugere agendamento/reserva online. */
   hasBooking?: boolean;
+  /**
+   * Sinais de código antigo na página inicial (doctype antigo, layout em
+   * tabelas, tags obsoletas, Flash, jQuery 1.x/2.x). Vazio = nenhum sinal.
+   */
+  legacyCues?: string[];
+  /** Imagens da página inicial. */
+  images?: { total: number; withAlt: number; optimized: number };
 }
 
 const CTA_PATTERN =
@@ -51,6 +58,72 @@ const BOOKING_PATTERN =
 
 const PHONE_PATTERN =
   /(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g;
+
+/** Sinais objetivos de que o código da página é antigo. Não julga o visual. */
+export function detectLegacyCues(html: string, $: cheerio.CheerioAPI): string[] {
+  const cues: string[] = [];
+  const doctype = html.slice(0, 1500).match(/<!doctype[^>]*>/i)?.[0];
+
+  if (!doctype) {
+    cues.push("sem declaração de documento moderna (doctype)");
+  } else if (/xhtml|html 4|html 3|transitional|frameset/i.test(doctype)) {
+    cues.push("doctype antigo (HTML 4/XHTML)");
+  }
+
+  const tableLayout =
+    $("table[width], table[bgcolor], table[cellpadding], table[cellspacing]").length >= 2 ||
+    $("table table table").length > 0;
+
+  if (tableLayout) cues.push("layout montado com tabelas");
+
+  if ($("font, center, marquee, blink, frameset, frame, big, strike").length > 0) {
+    cues.push("tags obsoletas (font, center, marquee…)");
+  }
+
+  if (
+    $('object[type*="shockwave"], embed[type*="shockwave"], embed[src$=".swf"], object[data$=".swf"]').length > 0 ||
+    /\.swf(["'?\s])/i.test(html)
+  ) {
+    cues.push("usa Flash");
+  }
+
+  const jqueryMajors = [
+    // jquery-1.12.4.min.js · jquery/2.2.4/jquery.min.js · jquery@1.9
+    ...html.matchAll(/jquery[-.\/@]?(?:v)?(\d+)\.\d+/gi),
+    // jquery.min.js?ver=1.12.4 (WordPress)
+    ...html.matchAll(/jquery(?:\.min)?\.js\?ver=(\d+)\./gi),
+  ].map((m) => Number(m[1]));
+  const oldJquery = jqueryMajors.some((major) => major === 1 || major === 2);
+
+  if (oldJquery) cues.push("jQuery antigo (versão 1.x/2.x)");
+
+  return cues;
+}
+
+function imageStats($: cheerio.CheerioAPI) {
+  const imgs = $("img").toArray();
+
+  let withAlt = 0;
+  let optimized = 0;
+
+  for (const el of imgs) {
+    const img = $(el);
+    const src = `${img.attr("src") ?? ""} ${img.attr("data-src") ?? ""}`;
+
+    if ((img.attr("alt") ?? "").trim()) withAlt += 1;
+
+    if (
+      img.attr("srcset") ||
+      img.attr("loading") === "lazy" ||
+      /\.(webp|avif)(\?|\s|$)/i.test(src) ||
+      img.parent("picture").length > 0
+    ) {
+      optimized += 1;
+    }
+  }
+
+  return { total: imgs.length, withAlt, optimized };
+}
 
 function detectTechnologies(
   html: string,
@@ -219,6 +292,8 @@ export function extractWebsiteFacts(
       ECOMMERCE_PATTERN.test(bodyText) ||
       /(woocommerce|cdn\.shopify\.com|nuvemshop|lojaintegrada|vtex)/i.test(html),
     hasBooking: BOOKING_PATTERN.test(bodyText),
+    legacyCues: detectLegacyCues(html, $),
+    images: imageStats($),
   };
 }
 
@@ -254,6 +329,8 @@ export function failedWebsiteFacts(
     hasPrivacyLink: false,
     sellsOnline: false,
     hasBooking: false,
+    legacyCues: [],
+    images: { total: 0, withAlt: 0, optimized: 0 },
   };
 }
 

@@ -265,7 +265,7 @@ export interface Improvement {
   title: string;
   evidence: string;
   suggestion: string;
-  origin: "Análise do site" | "Diagnóstico da IA";
+  origin: "Análise do site" | "Revisão visual" | "Diagnóstico da IA";
 }
 
 const SIGNAL_SUGGESTION: Record<string, string> = {
@@ -279,6 +279,11 @@ const SIGNAL_SUGGESTION: Record<string, string> = {
   BROKEN_LINK: "Recolocar o site no ar: o endereço atual não abre.",
   WEAK_CONVERSION_PATH: "Encurtar o caminho do visitante até o contato.",
   NO_MOBILE_SIGNAL: "Adaptar o site para funcionar bem no celular.",
+  DATED_SITE: "Modernizar o site: o visual e o código mostram que ficou parado no tempo.",
+  SLOW_SITE: "Deixar o site rápido no celular: hoje ele demora para mostrar o conteúdo.",
+  NO_BANNERS: "Criar banners e artes de divulgação profissionais para o Instagram e o site.",
+  OLD_BANNERS: "Refazer os banners com visual atual e identidade visual consistente.",
+  WEAK_SOCIAL_PROFILE: "Reformular o perfil (foto, bio, link e destaques) para passar profissionalismo.",
 };
 
 /** O que melhorar no NEGÓCIO da empresa (separado dos dados que faltam). */
@@ -293,7 +298,7 @@ export async function loadImprovements(companyId: number): Promise<Improvement[]
     title: SIGNAL_LABEL[s.type] ?? s.type,
     evidence: s.evidence,
     suggestion: SIGNAL_SUGGESTION[s.type] ?? "Avaliar a melhoria com a equipe.",
-    origin: "Análise do site",
+    origin: s.source === "VISUAL_REVIEW" ? "Revisão visual" : "Análise do site",
   }));
 
   const fromAi: Improvement[] = parseBottlenecks(analysis).map((b) => ({

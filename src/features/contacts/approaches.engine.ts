@@ -37,6 +37,11 @@ const OBSERVATION: Partial<Record<SignalType, string>> = {
   NO_CLEAR_CTA: "não achei um botão claro de agendamento ou orçamento no site",
   NO_FORM: "o site não tem um formulário de contato",
   NO_WHATSAPP: "não vi um botão de WhatsApp no site",
+  NO_BANNERS: "não encontrei banners ou artes de divulgação nas redes de vocês",
+  OLD_BANNERS: "as artes de divulgação de vocês parecem ter ficado para trás",
+  DATED_SITE: "o site parece ter ficado com o visual de alguns anos atrás",
+  SLOW_SITE: "o site demora para carregar no celular",
+  WEAK_SOCIAL_PROFILE: "o perfil de vocês nas redes poderia passar mais profissionalismo",
 };
 
 const OFFER: Record<ServiceKey, { angle: string; pitch: string }> = {
@@ -59,6 +64,10 @@ const OFFER: Record<ServiceKey, { angle: string; pitch: string }> = {
   SUPORTE: {
     angle: "Suporte contínuo para manter tudo atualizado",
     pitch: "cuidamos de ajustes, atualizações e acompanhamento depois da entrega",
+  },
+  DESIGN_SOCIAL: {
+    angle: "Banners e redes sociais com cara de empresa profissional",
+    pitch: "criamos banners, artes e a identidade visual do Instagram e do WhatsApp Business para a sua empresa passar a imagem que ela merece",
   },
 };
 

@@ -11,6 +11,20 @@ export type ChatJson = (
   messages: ChatMessage[],
 ) => Promise<{ json: unknown; model: string }>;
 
+export type VisionPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+
+/** Mensagem com imagens (prints) para modelos com visão. */
+export interface VisionMessage {
+  role: "system" | "user";
+  content: string | VisionPart[];
+}
+
+export type VisionChatJson = (
+  messages: VisionMessage[],
+) => Promise<{ json: unknown; model: string }>;
+
 // USD por 1M tokens (aproximação para estimativa de custo).
 const PRICING: Record<string, [number, number]> = {
   "gpt-4o-mini": [0.15, 0.6],
@@ -66,7 +80,9 @@ export async function testOpenAiConnection(): Promise<string> {
     : `A API respondeu (modelo ${model}), mas com conteúdo inesperado.`;
 }
 
-export const openaiChatJson: ChatJson = async (messages) => {
+async function postChatJson(
+  messages: ChatMessage[] | VisionMessage[],
+): Promise<{ json: unknown; model: string }> {
   const apiKey = await getSetting("openai_api_key");
 
   if (!apiKey) {
@@ -122,4 +138,9 @@ export const openaiChatJson: ChatJson = async (messages) => {
   } catch {
     throw new Error("A OpenAI não retornou JSON válido.");
   }
-};
+}
+
+export const openaiChatJson: ChatJson = (messages) => postChatJson(messages);
+
+/** Igual ao chat em JSON, mas aceita imagens (o modelo precisa ter visão, ex.: gpt-4o-mini). */
+export const openaiVisionJson: VisionChatJson = (messages) => postChatJson(messages);

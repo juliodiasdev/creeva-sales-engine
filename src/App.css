@@ -1163,6 +1163,33 @@ code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-
 .moment-ready { border-color: #2f6f4b; }
 .moment-needs_data { border-color: #7a6320; }
 .presence-table th:nth-child(1) { width: 24%; }
+.presence-table tbody th { white-space: normal; }
 .presence-table th:nth-child(2) { width: 14%; }
 .presence-table th:nth-child(3) { width: 40%; }
 .presence-table th:nth-child(4) { width: 22%; }
+
+/* Revisão visual (Instagram, WhatsApp, site) */
+.visual-card { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); padding: 12px 14px; margin: 10px 0; }
+.visual-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.visual-form { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 10px; }
+.visual-upload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.visual-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.visual-thumb { position: relative; }
+.visual-thumb img { height: 96px; width: auto; border-radius: 6px; border: 1px solid var(--line); display: block; }
+.visual-thumb button { position: absolute; top: 4px; right: 4px; padding: 0 6px; min-height: 0; line-height: 18px; font-size: 11px; }
+.visual-shot { max-height: 260px; width: auto; border-radius: 8px; border: 1px solid var(--line); }
+.visual-items { display: grid; gap: 12px; }
+.visual-item { display: grid; grid-template-columns: minmax(180px, 1.1fr) auto minmax(180px, 1.6fr); gap: 6px 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.visual-item .visual-hint { grid-column: 2 / 4; margin: 0; }
+.visual-item input[type="text"] { grid-column: 3; grid-row: 1; }
+.visual-item .seg { grid-column: 2; grid-row: 1; }
+.seg { display: inline-flex; gap: 4px; }
+.seg button { padding: 4px 10px; font-size: 12px; }
+.seg button.on.seg-ok { background: #1f5c3a; color: #cdf5dc; border-color: #2f6f4b; }
+.seg button.on.seg-partial { background: #6b5518; color: #ffefba; border-color: #7a6320; }
+.seg button.on.seg-missing { background: #6e2a2a; color: #ffd6d6; border-color: #7a3030; }
+.notice { color: #8cc7ff; }
+@media (max-width: 860px) {
+  .visual-item { grid-template-columns: 1fr; }
+  .visual-item .visual-hint, .visual-item input[type="text"], .visual-item .seg { grid-column: 1; grid-row: auto; }
+}

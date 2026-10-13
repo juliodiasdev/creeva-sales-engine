@@ -454,6 +454,23 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE whatsapp_events ADD COLUMN claimed_at DATETIME`,
     ],
   },
+  {
+    version: 12,
+    name: "visual_reviews",
+    statements: [
+      `CREATE TABLE visual_reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        target TEXT NOT NULL,
+        answers TEXT NOT NULL DEFAULT '[]',
+        metrics TEXT,
+        summary TEXT,
+        source TEXT NOT NULL DEFAULT 'MANUAL',
+        reviewed_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (company_id, target)
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(

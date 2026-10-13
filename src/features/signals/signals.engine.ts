@@ -1,6 +1,8 @@
 import { isGenericHost } from "../../lib/normalize";
 import type { Company } from "../companies/company.types";
 import type { WebsiteFacts } from "../enrichment/website.facts";
+import { VISUAL_CHECKLIST } from "../visual/visual.checklist";
+import type { VisualReview, VisualTarget } from "../visual/visual.checklist";
 
 export type SignalType =
   | "NO_WEBSITE"
@@ -12,13 +14,19 @@ export type SignalType =
   | "LOW_REVIEWS"
   | "BROKEN_LINK"
   | "WEAK_CONVERSION_PATH"
-  | "NO_MOBILE_SIGNAL";
+  | "NO_MOBILE_SIGNAL"
+  // Vindos do código do site, do Google PageSpeed e da revisão visual (Instagram, WhatsApp, site).
+  | "DATED_SITE"
+  | "SLOW_SITE"
+  | "NO_BANNERS"
+  | "OLD_BANNERS"
+  | "WEAK_SOCIAL_PROFILE";
 
 export interface Signal {
   type: SignalType;
   value: string | null;
   evidence: string;
-  source: "GOOGLE_PLACES" | "WEBSITE" | "MANUAL";
+  source: "GOOGLE_PLACES" | "WEBSITE" | "MANUAL" | "VISUAL_REVIEW";
   confidence: number;
 }
 
@@ -34,6 +42,21 @@ export function deriveSignals(
   >,
   facts: WebsiteFacts | null,
   currentYear = new Date().getFullYear(),
+  reviews: VisualReview[] = [],
+): Signal[] {
+  return [
+    ...deriveCoreSignals(company, facts, currentYear),
+    ...deriveVisualSignals(facts, reviews),
+  ];
+}
+
+function deriveCoreSignals(
+  company: Pick<
+    Company,
+    "website" | "rating" | "reviews_count"
+  >,
+  facts: WebsiteFacts | null,
+  currentYear: number,
 ): Signal[] {
   const signals: Signal[] = [];
 
@@ -153,6 +176,102 @@ export function deriveSignals(
       evidence: "Sem CTA, formulário nem WhatsApp na página inicial: o caminho até o contato/agendamento não está destacado.",
       source: "WEBSITE",
       confidence: 0.7,
+    });
+  }
+
+  return signals;
+}
+
+/**
+ * Sinais da revisão visual: só existem se o vendedor respondeu (ou conferiu a
+ * sugestão da IA). Cada um cita a observação feita, nunca inventa.
+ */
+function deriveVisualSignals(
+  facts: WebsiteFacts | null,
+  reviews: VisualReview[],
+): Signal[] {
+  const signals: Signal[] = [];
+
+  const answer = (target: VisualTarget, id: string) =>
+    reviews.find((r) => r.target === target)?.answers.find((a) => a.id === id);
+
+  const noted = (a: { note?: string } | undefined) => (a?.note ? `: ${a.note}` : ".");
+
+  const igBanners = answer("INSTAGRAM", "banners");
+  const siteHero = answer("SITE", "hero");
+
+  if (igBanners?.status === "FAIL" || siteHero?.status === "FAIL") {
+    signals.push({
+      type: "NO_BANNERS",
+      value: null,
+      evidence: [
+        igBanners?.status === "FAIL" ? `Instagram sem banners ou artes de divulgação (revisão visual)${noted(igBanners)}` : null,
+        siteHero?.status === "FAIL" ? `Site sem banner principal (revisão visual)${noted(siteHero)}` : null,
+      ].filter(Boolean).join(" "),
+      source: "VISUAL_REVIEW",
+      confidence: 0.8,
+    });
+  } else if (igBanners?.status === "WARN" || siteHero?.status === "WARN") {
+    signals.push({
+      type: "OLD_BANNERS",
+      value: null,
+      evidence: [
+        igBanners?.status === "WARN" ? `Instagram com artes antigas ou amadoras (revisão visual)${noted(igBanners)}` : null,
+        siteHero?.status === "WARN" ? `Banner principal do site fraco ou genérico (revisão visual)${noted(siteHero)}` : null,
+      ].filter(Boolean).join(" "),
+      source: "VISUAL_REVIEW",
+      confidence: 0.7,
+    });
+  }
+
+  const cues = facts && !facts.error ? (facts.legacyCues ?? []) : [];
+  const design = answer("SITE", "design");
+
+  if (cues.length >= 2 || design?.status === "FAIL") {
+    signals.push({
+      type: "DATED_SITE",
+      value: null,
+      evidence: [
+        cues.length >= 2 ? `Sinais de site antigo no código: ${cues.join("; ")}.` : null,
+        design?.status === "FAIL" ? `Aparência do site datada (revisão visual)${noted(design)}` : null,
+      ].filter(Boolean).join(" "),
+      source: design?.status === "FAIL" ? "VISUAL_REVIEW" : "WEBSITE",
+      confidence: design?.status === "FAIL" ? 0.8 : 0.7,
+    });
+  }
+
+  const metrics = reviews.find((r) => r.target === "SITE")?.metrics;
+
+  if (metrics && metrics.performance !== null && metrics.performance < 50) {
+    signals.push({
+      type: "SLOW_SITE",
+      value: String(metrics.performance),
+      evidence: `Google PageSpeed (celular): nota ${metrics.performance}/100${metrics.lcpMs != null ? `, conteúdo principal em ${(metrics.lcpMs / 1000).toFixed(1)} s` : ""}.`,
+      source: "WEBSITE",
+      confidence: 0.9,
+    });
+  }
+
+  const WEAK: [VisualTarget, string[], string][] = [
+    ["INSTAGRAM", ["avatar", "bio", "link", "identity", "recency"], "Instagram"],
+    ["WHATSAPP", ["business", "photo", "profile"], "WhatsApp Business"],
+  ];
+
+  const weak = WEAK.flatMap(([target, ids, name]) => {
+    const labels = ids
+      .filter((id) => answer(target, id)?.status === "FAIL")
+      .map((id) => VISUAL_CHECKLIST[target].find((i) => i.id === id)!.label);
+
+    return labels.length > 0 ? [`${name} — ${labels.join(", ")}`] : [];
+  });
+
+  if (weak.length > 0) {
+    signals.push({
+      type: "WEAK_SOCIAL_PROFILE",
+      value: null,
+      evidence: `Perfil fraco na revisão visual: ${weak.join("; ")}.`,
+      source: "VISUAL_REVIEW",
+      confidence: 0.75,
     });
   }
 

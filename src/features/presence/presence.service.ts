@@ -4,6 +4,7 @@ import { getCompanyRepository } from "../companies/company.repository";
 import { listChannelsRepository } from "../contacts/channels.repository";
 import { consolidateChannels } from "../contacts/consolidate";
 import { getLatestSnapshotRepository } from "../enrichment/enrichment.repository";
+import { listVisualReviewsRepository } from "../visual/visual.repository";
 
 import { assessPresence, PRESENCE_VERSION } from "./presence.engine";
 import type { PresenceLevel, PresenceReport, SaleMoment } from "./presence.engine";
@@ -57,15 +58,17 @@ export async function assessAndSavePresence(
 
   if (!company) throw new Error("Empresa não encontrada.");
 
-  const [channels, facts] = await Promise.all([
+  const [channels, facts, reviews] = await Promise.all([
     listChannelsRepository(companyId),
     getLatestSnapshotRepository(companyId),
+    listVisualReviewsRepository(companyId),
   ]);
 
   const report = assessPresence({
     company,
     channels: consolidateChannels(channels).main,
     facts,
+    reviews,
     now,
   });
 

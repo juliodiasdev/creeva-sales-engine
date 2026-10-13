@@ -74,6 +74,15 @@ export function matchServices(input: {
     add("SUPORTE", 3, "Site sem manutenção aparente: " + evidence("OUTDATED_COPYRIGHT"), "OUTDATED_COPYRIGHT");
   }
 
+  // Site antigo ou lento
+  if (has("DATED_SITE")) add("SITE_LOJA", 4, evidence("DATED_SITE"), "DATED_SITE");
+  if (has("SLOW_SITE")) add("SITE_LOJA", 3, evidence("SLOW_SITE"), "SLOW_SITE");
+
+  // Design e redes sociais (banners, perfis)
+  if (has("NO_BANNERS")) add("DESIGN_SOCIAL", 6, evidence("NO_BANNERS"), "NO_BANNERS");
+  if (has("OLD_BANNERS")) add("DESIGN_SOCIAL", 4, evidence("OLD_BANNERS"), "OLD_BANNERS");
+  if (has("WEAK_SOCIAL_PROFILE")) add("DESIGN_SOCIAL", 3, evidence("WEAK_SOCIAL_PROFILE"), "WEAK_SOCIAL_PROFILE");
+
   // Landing pages / conversão
   if (has("WEAK_CONVERSION_PATH")) add("LANDING_PAGE", 5, evidence("WEAK_CONVERSION_PATH"), "WEAK_CONVERSION_PATH");
   if (has("NO_CLEAR_CTA")) add("LANDING_PAGE", 3, evidence("NO_CLEAR_CTA"), "NO_CLEAR_CTA");

@@ -29,6 +29,11 @@ const NEED_WEIGHTS: Record<SignalType, number> = {
   OUTDATED_COPYRIGHT: 4,
   NO_FORM: 3,
   LOW_REVIEWS: 4,
+  NO_BANNERS: 6,
+  DATED_SITE: 5,
+  WEAK_SOCIAL_PROFILE: 4,
+  SLOW_SITE: 4,
+  OLD_BANNERS: 3,
 };
 
 const cap = (n: number) => Math.max(0, Math.min(25, n));

@@ -4,6 +4,7 @@ import { ErrorMessage } from "../../components/ErrorMessage";
 import { errorMessage, formatDateTime } from "../../lib/format";
 import { listServices } from "../services/services.service";
 import type { Service } from "../services/services.service";
+import { VisualReviewPanel } from "../visual/VisualReviewPanel";
 
 import { LEVEL_LABEL, LEVEL_THRESHOLDS, MOMENT_LABEL } from "./presence.engine";
 import type { Check, CheckStatus, SaleMoment } from "./presence.engine";
@@ -110,6 +111,14 @@ export function PresencePanel({
 
       <ErrorMessage message={error} />
 
+      <VisualReviewPanel
+        companyId={companyId}
+        onChanged={() => {
+          void load();
+          onChanged?.();
+        }}
+      />
+
       {!report ? (
         <p className="muted">
           Rode "Enriquecer" (com a leitura do site) ou clique em "Avaliar agora" para checar o
@@ -128,6 +137,12 @@ export function PresencePanel({
                   <li key={b}>{b}</li>
                 ))}
               </ul>
+            )}
+
+            {(report.pending ?? []).length > 0 && (
+              <p className="muted small">
+                Para completar a avaliação, falta: {(report.pending ?? []).join(" · ")}.
+              </p>
             )}
 
             {report.moment === "READY" && report.offers.length > 0 && (
@@ -200,7 +215,7 @@ export function PresencePanel({
           <p className="muted small">
             Nota: abaixo de {LEVEL_THRESHOLDS.BASIC} = básica · {LEVEL_THRESHOLDS.BASIC} a{" "}
             {LEVEL_THRESHOLDS.INTERMEDIATE - 1} = intermediária · {LEVEL_THRESHOLDS.INTERMEDIATE}+ =
-            avançada. Sem site e sem redes = sem presença.
+            avançada (e só se nada medido indicar site antigo ou imagem defasada). Sem site e sem redes = sem presença.
           </p>
 
           <ul className="reasons muted small">

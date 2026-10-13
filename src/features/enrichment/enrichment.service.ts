@@ -10,6 +10,8 @@ import { getSetting } from "../settings/settings.service";
 
 import { deriveSignals } from "../signals/signals.engine";
 import { computeScore } from "../scoring/scoring.engine";
+import type { ScoreResult } from "../scoring/scoring.engine";
+import { listVisualReviewsRepository } from "../visual/visual.repository";
 
 import {
   getLatestSnapshotRepository,
@@ -59,6 +61,71 @@ export const DEFAULT_ENRICH_OPTIONS: EnrichOptions = {
 };
 
 type Crawler = (url: string) => Promise<WebsiteFacts>;
+
+/**
+ * Sinais, pontuação, presença digital e abordagens-modelo a partir do que já está
+ * salvo (última leitura do site, canais e revisões visuais). Determinístico.
+ * Reaproveitado quando uma revisão visual muda, sem ler o site de novo.
+ */
+export async function analyzeCompany(companyId: number): Promise<ScoreResult> {
+  const company = await getCompanyRepository(companyId);
+
+  if (!company) throw new Error("Empresa não encontrada.");
+
+  const [facts, reviews] = await Promise.all([
+    getLatestSnapshotRepository(companyId),
+    listVisualReviewsRepository(companyId),
+  ]);
+
+  const signals = deriveSignals(company, facts, new Date().getFullYear(), reviews);
+  await replaceSignalsRepository(companyId, signals);
+
+  const preferred = (
+    (await getSetting("preferred_segments")) ?? ""
+  )
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const score = computeScore({
+    company,
+    signals,
+    facts,
+    preferredSegments: preferred,
+  });
+
+  await saveScoreRepository(companyId, score);
+
+  // Avaliação da presença digital com os dados que acabaram de ser coletados.
+  await assessAndSavePresence(companyId, new Date());
+
+  // Serviços da Creava mais adequados + abordagens por canal (templates).
+  const services = await listServices(true);
+
+  const matches = matchServices({
+    company,
+    signals,
+    facts,
+    activeKeys: services.map((s) => s.key as ServiceKey),
+  });
+
+  await replaceApproachesRepository(
+    companyId,
+    "TEMPLATE",
+    buildTemplateApproaches({
+      companyName: company.name,
+      segment: company.segment,
+      matches,
+      availableChannels: [
+        ...new Set((await listChannelsRepository(companyId)).map((c) => c.kind)),
+      ],
+      agency: (await getSetting("company_name")) ?? "Creava Digital",
+      seller: (await getSetting("seller_name")) ?? "",
+    }),
+  );
+
+  return score;
+}
 
 /**
  * Nova -> Enriquecendo -> Enriquecida. Quem qualifica ou descarta é o
@@ -113,55 +180,7 @@ export async function enrichCompany(
     };
   }
 
-  const signals = deriveSignals(company, facts);
-  await replaceSignalsRepository(companyId, signals);
-
-  const preferred = (
-    (await getSetting("preferred_segments")) ?? ""
-  )
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const score = computeScore({
-    company,
-    signals,
-    facts,
-    preferredSegments: preferred,
-  });
-
-  await saveScoreRepository(companyId, score);
-
-  // Avaliação da presença digital com os dados que acabaram de ser coletados.
-  await assessAndSavePresence(companyId, new Date());
-
-  // Serviços da Creava mais adequados + abordagens por canal (templates).
-  const services = await listServices(true);
-
-  const matches = matchServices({
-    company,
-    signals,
-    facts,
-    activeKeys: services.map((s) => s.key as ServiceKey),
-  });
-
-  await replaceApproachesRepository(
-    companyId,
-    "TEMPLATE",
-    buildTemplateApproaches({
-      companyName: company.name,
-      segment: company.segment,
-      matches,
-      availableChannels: [
-        ...new Set([
-          ...channels.map((c) => c.kind),
-          ...(await listChannelsRepository(companyId)).map((c) => c.kind),
-        ]),
-      ],
-      agency: (await getSetting("company_name")) ?? "Creava Digital",
-      seller: (await getSetting("seller_name")) ?? "",
-    }),
-  );
+  const score = await analyzeCompany(companyId);
 
   if (!inTriage) {
     return {

@@ -2,17 +2,22 @@ import type { Company } from "../companies/company.types";
 import type { WebsiteFacts } from "../enrichment/website.facts";
 import type { ServiceKey } from "../services/services.service";
 import { isGenericHost, normalizeDomain } from "../../lib/normalize";
+import {
+  VISUAL_CHECKLIST,
+  VISUAL_TARGET_LABEL,
+} from "../visual/visual.checklist";
+import type { VisualReview, VisualTarget } from "../visual/visual.checklist";
 
 /**
  * Avaliação da PRESENÇA DIGITAL de uma empresa. 100% determinística e baseada
  * só em dados reais coletados (Google Maps, site, canais). O que não foi
  * possível medir é marcado como UNKNOWN e NÃO entra na nota.
  */
-export const PRESENCE_VERSION = 1;
+export const PRESENCE_VERSION = 2;
 
 export type CheckStatus = "OK" | "WARN" | "FAIL" | "UNKNOWN";
 
-export type DimensionKey = "GOOGLE" | "SITE" | "SOCIAL" | "CONTACT" | "CONVERSION";
+export type DimensionKey = "GOOGLE" | "SITE" | "SOCIAL" | "VISUAL" | "CONTACT" | "CONVERSION";
 
 export interface Check {
   id: string;
@@ -86,13 +91,16 @@ export interface PresenceReport {
   blockers: string[];
   /** Ressalvas sobre o que o app NÃO consegue medir. */
   notes: string[];
+  /** Revisões visuais (Instagram, WhatsApp, site) que ainda faltam fazer. Ausente em relatórios antigos. */
+  pending?: string[];
 }
 
 const DIMENSION_META: Record<DimensionKey, { label: string; weight: number }> = {
-  GOOGLE: { label: "Google Maps", weight: 20 },
-  SITE: { label: "Site", weight: 40 },
-  SOCIAL: { label: "Redes sociais", weight: 15 },
-  CONTACT: { label: "Canais de contato", weight: 15 },
+  GOOGLE: { label: "Google Maps", weight: 15 },
+  SITE: { label: "Site", weight: 35 },
+  SOCIAL: { label: "Redes sociais", weight: 10 },
+  VISUAL: { label: "Imagem e perfis (banners, Instagram, WhatsApp)", weight: 20 },
+  CONTACT: { label: "Canais de contato", weight: 10 },
   CONVERSION: { label: "Conversão e vendas online", weight: 10 },
 };
 
@@ -118,6 +126,8 @@ interface Input {
   /** Canais já consolidados (um por tipo é suficiente). */
   channels: { kind: string; value: string; label: string | null }[];
   facts: WebsiteFacts | null;
+  /** Revisões visuais já feitas (Instagram, WhatsApp, aparência do site). */
+  reviews?: VisualReview[];
   now?: Date;
 }
 
@@ -133,6 +143,7 @@ const check = (
 
 export function assessPresence(input: Input): PresenceReport {
   const { company, channels, facts } = input;
+  const visualReviews = input.reviews ?? [];
   const year = (input.now ?? new Date()).getFullYear();
   const has = (kind: string) => channels.some((c) => c.kind === kind);
 
@@ -278,6 +289,44 @@ export function assessPresence(input: Input): PresenceReport {
         check("site.lgpd", "SITE", "Política de privacidade (LGPD)",
           f.hasPrivacyLink === undefined ? "UNKNOWN" : f.hasPrivacyLink ? "OK" : "WARN",
           f.hasPrivacyLink === undefined ? unknown("leitura antiga") : f.hasPrivacyLink ? "Link encontrado." : "Sem link de privacidade.", 1, "SITE_LOJA"),
+        check("site.legacy", "SITE", "Tecnologia do site (código antigo?)",
+          f.legacyCues === undefined ? "UNKNOWN" : f.legacyCues.length === 0 ? "OK" : f.legacyCues.length === 1 ? "WARN" : "FAIL",
+          f.legacyCues === undefined
+            ? unknown("leitura antiga; refaça o enriquecimento")
+            : f.legacyCues.length === 0
+              ? "Nenhum sinal de código antigo."
+              : `Sinais de site antigo: ${f.legacyCues.join("; ")}.`,
+          4, "SITE_LOJA"),
+        check("site.images", "SITE", "Imagens da página inicial",
+          f.images === undefined
+            ? "UNKNOWN"
+            : f.images.total === 0 || f.images.optimized / f.images.total < 0.5 || f.images.withAlt / f.images.total < 0.5
+              ? "WARN"
+              : "OK",
+          f.images === undefined
+            ? unknown("leitura antiga; refaça o enriquecimento")
+            : f.images.total === 0
+              ? "Nenhuma imagem encontrada no código da página inicial (pode ser carregada por JavaScript)."
+              : `${f.images.total} imagem(ns): ${f.images.withAlt} com texto alternativo, ${f.images.optimized} com formato/carregamento moderno.`,
+          1, "SITE_LOJA"),
+      );
+    }
+
+    const psi = visualReviews.find((r) => r.target === "SITE")?.metrics;
+
+    if (psi && psi.performance !== null) {
+      const extra = [
+        psi.lcpMs != null ? `conteúdo principal em ${(psi.lcpMs / 1000).toFixed(1)} s` : null,
+        psi.seo != null ? `SEO ${psi.seo}` : null,
+        psi.bestPractices != null ? `boas práticas ${psi.bestPractices}` : null,
+        psi.accessibility != null ? `acessibilidade ${psi.accessibility}` : null,
+      ].filter(Boolean);
+
+      checks.push(
+        check("site.psi", "SITE", "Desempenho no celular (teste do Google)",
+          psi.performance >= 90 ? "OK" : psi.performance >= 50 ? "WARN" : "FAIL",
+          `Nota ${psi.performance}/100 no Google PageSpeed (celular)${extra.length ? `; ${extra.join(" · ")}` : ""}.`,
+          4, "SITE_LOJA"),
       );
     }
   }
@@ -287,7 +336,7 @@ export function assessPresence(input: Input): PresenceReport {
 
   checks.push(
     check("social.instagram", "SOCIAL", "Instagram", has("INSTAGRAM") ? "OK" : "FAIL",
-      has("INSTAGRAM") ? "Perfil encontrado." : "Nenhum perfil de Instagram encontrado.", 4, "LANDING_PAGE"),
+      has("INSTAGRAM") ? "Perfil encontrado." : "Nenhum perfil de Instagram encontrado.", 4, "DESIGN_SOCIAL"),
     check("social.facebook", "SOCIAL", "Facebook", has("FACEBOOK") ? "OK" : "WARN",
       has("FACEBOOK") ? "Página encontrada." : "Nenhuma página de Facebook encontrada.", 2),
     check("social.linkedin", "SOCIAL", "LinkedIn", has("LINKEDIN") ? "OK" : "WARN",
@@ -306,6 +355,45 @@ export function assessPresence(input: Input): PresenceReport {
   /* ---------- Contato ---------- */
   const wa = channels.find((c) => c.kind === "WHATSAPP");
   const probable = !!wa?.label?.startsWith("provável");
+
+  /* ---------- Imagem e perfis (revisão visual) ---------- */
+  const pending: string[] = [];
+  const applicable: Record<VisualTarget, boolean> = {
+    INSTAGRAM: has("INSTAGRAM"),
+    WHATSAPP: !!wa && !probable,
+    SITE: hasSite,
+  };
+
+  for (const target of Object.keys(applicable) as VisualTarget[]) {
+    const review = visualReviews.find((r) => r.target === target);
+    const answers = new Map((review?.answers ?? []).map((a) => [a.id, a]));
+
+    if (answers.size === 0) {
+      if (!applicable[target]) continue;
+
+      pending.push(`Revisão visual: ${VISUAL_TARGET_LABEL[target]}`);
+      checks.push(
+        check(`visual.${target.toLowerCase()}`, "VISUAL", VISUAL_TARGET_LABEL[target], "UNKNOWN",
+          "Não medido: faça a revisão visual (veja o perfil e responda o checklist, ou envie prints para a IA sugerir).",
+          6, null),
+      );
+      continue;
+    }
+
+    for (const item of VISUAL_CHECKLIST[target]) {
+      const answer = answers.get(item.id);
+
+      checks.push(
+        check(`visual.${target.toLowerCase()}.${item.id}`, "VISUAL",
+          `${VISUAL_TARGET_LABEL[target]}: ${item.label}`,
+          answer ? answer.status : "UNKNOWN",
+          answer
+            ? `${item.hints[answer.status]}${answer.note ? ` — ${answer.note}` : ""}`
+            : "Não avaliado na revisão.",
+          item.weight, item.service),
+      );
+    }
+  }
 
   checks.push(
     check("contact.whatsapp", "CONTACT", "WhatsApp", !wa ? "FAIL" : probable ? "WARN" : "OK",
@@ -360,7 +448,10 @@ export function assessPresence(input: Input): PresenceReport {
     : null;
 
   // Confiança: quanto do peso total pôde ser medido (cada dimensão pesa o que pesa).
-  const allWeight = dimensions.reduce((n, d) => n + d.weight, 0);
+  // A dimensão visual só entra quando há algo a revisar (sem Instagram, WhatsApp nem site, não há o que olhar).
+  const allWeight = dimensions
+    .filter((d) => d.key !== "VISUAL" || d.checks.length > 0)
+    .reduce((n, d) => n + d.weight, 0);
   const measured = dimensions.reduce((n, d) => {
     const list = d.checks;
     const total = list.reduce((a, c) => a + c.weight, 0);
@@ -375,11 +466,17 @@ export function assessPresence(input: Input): PresenceReport {
   const noPresence = !hasSite && socials.length === 0;
 
   const score = rawScore;
+
+  // Presença só é "avançada" se nada medido indicar site antigo ou imagem defasada:
+  // ter HTTPS, celular e botão não compensa um site com cara de 2010 ou um Instagram sem banners.
+  const DATED = ["site.legacy", "site.fresh", "site.psi", "visual.site.design", "visual.instagram.banners"];
+  const dated = checks.filter((c) => DATED.includes(c.id) && c.status === "FAIL");
+
   const level: PresenceLevel = noPresence
     ? "NONE"
     : score === null || score < LEVEL_THRESHOLDS.BASIC
       ? "BASIC"
-      : score < LEVEL_THRESHOLDS.INTERMEDIATE
+      : score < LEVEL_THRESHOLDS.INTERMEDIATE || dated.length > 0
         ? "INTERMEDIATE"
         : "ADVANCED";
 
@@ -447,7 +544,9 @@ export function assessPresence(input: Input): PresenceReport {
     : level === "BASIC"
       ? "Está online, mas de forma frágil: a base existe e falta estrutura para gerar contatos de forma previsível."
       : level === "INTERMEDIATE"
-        ? "Boa base digital, com brechas claras na conversão e no atendimento que travam o crescimento."
+        ? dated.length > 0 && (score ?? 0) >= LEVEL_THRESHOLDS.INTERMEDIATE
+          ? "Presença estruturada, mas com a imagem defasada (site antigo, lento ou banners e perfis fracos): espaço claro para modernizar e vender design."
+          : "Boa base digital, com brechas claras na conversão e no atendimento que travam o crescimento."
         : "Presença forte: o espaço está em automatizar o que já funciona e em manter tudo evoluindo.";
 
   return {
@@ -463,9 +562,11 @@ export function assessPresence(input: Input): PresenceReport {
     offers,
     blockers,
     notes: [
-      "A atividade nas redes sociais (frequência de posts) não é medida: exige a API de cada rede.",
-      "O tempo medido é o do servidor para entregar a página inicial, não o carregamento completo.",
+      "Instagram e WhatsApp não podem ser lidos automaticamente (as redes bloqueiam robôs e a API oficial exige aprovação da Meta): banners, feed e perfil vêm da revisão visual feita por você, com a IA só sugerindo a partir de prints.",
+      "O tempo de resposta mede só o servidor; o teste do Google PageSpeed mede o carregamento no celular.",
+      "Os sinais de site antigo vêm do código da página (tabelas, tags obsoletas, Flash, jQuery antigo); a aparência real é julgada na revisão visual.",
       "Ferramentas carregadas por JavaScript (chat, agendamento, analytics) podem não aparecer na leitura do código.",
     ],
+    pending,
   };
 }

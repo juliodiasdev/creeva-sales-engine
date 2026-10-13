@@ -15,7 +15,8 @@ export type ServiceKey =
   | "SITE_LOJA"
   | "SOFTWARE_APP"
   | "SISTEMA_AUTOMACAO"
-  | "SUPORTE";
+  | "SUPORTE"
+  | "DESIGN_SOCIAL";
 
 /** Catálogo inicial (editável em Settings). */
 export const DEFAULT_SERVICES: Omit<Service, "id">[] = [
@@ -69,20 +70,36 @@ export const DEFAULT_SERVICES: Omit<Service, "id">[] = [
     active: 1,
     sort: 5,
   },
+  {
+    key: "DESIGN_SOCIAL",
+    name: "Design e redes sociais",
+    description:
+      "Banners, artes para promoções e produtos, identidade visual e perfis profissionais no Instagram e no WhatsApp Business.",
+    pain_points:
+      "Instagram sem artes ou com banners antigos e amadores, feed sem identidade visual, perfil e WhatsApp Business incompletos: a empresa parece menor do que é.",
+    active: 1,
+    sort: 6,
+  },
 ];
 
+/**
+ * Garante o catálogo padrão. Na primeira vez cria tudo; depois só ACRESCENTA
+ * serviços novos que ainda não existem (por chave), sem tocar nos que o usuário
+ * já editou ou desativou.
+ */
 export async function ensureServicesSeed(): Promise<void> {
   const supabase = getSupabase();
 
-  const { count, error } = await supabase
-    .from("services")
-    .select("id", { count: "exact", head: true });
+  const existing = unwrap(
+    await supabase.from("services").select("key"),
+  ) as { key: string }[];
 
-  if (error) throw new Error(error.message);
+  const have = new Set(existing.map((s) => s.key));
+  const missing = DEFAULT_SERVICES.filter((s) => !have.has(s.key));
 
-  if ((count ?? 0) > 0) return;
+  if (missing.length === 0) return;
 
-  unwrap(await supabase.from("services").insert(DEFAULT_SERVICES));
+  unwrap(await supabase.from("services").insert(missing));
 }
 
 export async function listServices(
