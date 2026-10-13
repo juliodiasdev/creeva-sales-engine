@@ -21,6 +21,7 @@ import { TodayPage } from "./pages/TodayPage";
 import { BasePage } from "./pages/BasePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ListsPage } from "./pages/ListsPage";
+import { QueuePage } from "./pages/QueuePage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { ProspectPage } from "./pages/ProspectPage";
 import { ListDetailPage } from "./pages/ListDetailPage";
@@ -52,6 +53,8 @@ function renderPage(
       return <DashboardPage />;
     case "prospect":
       return <ProspectPage onOpenList={openList} />;
+    case "queue":
+      return <QueuePage onOpenCompany={openCompany} />;
     case "conversations":
       return <ConversationsPage onOpenCompany={openCompany} />;
     case "lists":

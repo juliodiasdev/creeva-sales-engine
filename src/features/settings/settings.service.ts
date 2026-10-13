@@ -19,12 +19,14 @@ export type SettingKey =
   | "openai_model"
   | "anthropic_model"
   | "daily_last_run"
+  | "daily_send_limit"
   | "data_repairs";
 
 export const DEFAULTS: Partial<Record<SettingKey, string>> = {
   follow_up_delay_days: "2",
   proposal_follow_up_days: "3",
   min_score: "50",
+  daily_send_limit: "20",
   company_name: "Creava Digital",
   openai_model: "gpt-4o-mini",
   anthropic_model: "claude-sonnet-5-5",

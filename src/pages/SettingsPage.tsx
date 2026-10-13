@@ -43,6 +43,7 @@ const FIELDS: [SettingKey, string, string][] = [
   ["default_state", "UF padrão", "MT"],
   ["preferred_segments", "Segmentos preferidos (separados por vírgula)", "odontologia, advocacia"],
   ["min_score", "Pontuação mínima para qualificar", "50"],
+  ["daily_send_limit", "Limite de mensagens enviadas por dia", "20"],
   ["follow_up_delay_days", "Dias até o retorno (follow-up)", "2"],
   ["proposal_follow_up_days", "Dias até o retorno da proposta", "3"],
   ["openai_model", "Modelo OpenAI", "gpt-4o-mini"],
