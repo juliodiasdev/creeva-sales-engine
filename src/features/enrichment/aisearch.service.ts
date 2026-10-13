@@ -4,6 +4,7 @@ import type { WebSearch } from "../ai/openai.search";
 import { getCompanyRepository, setCompanyWebsiteRepository } from "../companies/company.repository";
 import { saveChannelsRepository, listChannelsRepository } from "../contacts/channels.repository";
 import { socialProfile } from "../../lib/normalize";
+import { assessAndSavePresence } from "../presence/presence.service";
 
 import { fetchPageText } from "./website.crawler";
 import { buildFichaRows, missingForSearch } from "./ficha.service";
@@ -211,6 +212,9 @@ export async function decideFinding(
 
   try {
     await applyFinding(Number(finding.company_id), finding.field, finding.value, finding.source_url);
+
+    // O dado novo muda a avaliação da presença: refaz sem nova leitura do site.
+    await assessAndSavePresence(Number(finding.company_id)).catch(() => undefined);
   } catch (err) {
     await reopenFindingRepository(id);
     throw err;

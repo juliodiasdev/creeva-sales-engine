@@ -430,6 +430,22 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX idx_findings_company ON enrichment_findings(company_id, status)`,
     ],
   },
+  {
+    version: 10,
+    name: "presence_reports",
+    statements: [
+      `CREATE TABLE presence_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
+        score INTEGER,
+        level TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0,
+        moment TEXT NOT NULL,
+        report TEXT NOT NULL,
+        computed_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(

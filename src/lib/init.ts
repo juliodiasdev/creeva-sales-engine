@@ -16,6 +16,7 @@ export async function initApp(): Promise<void> {
     () => supabase.from("bottleneck_feedback").select("id").limit(1),
     () => supabase.from("whatsapp_events").select("id").limit(1),
     () => supabase.from("enrichment_findings").select("id").limit(1),
+    () => supabase.from("presence_reports").select("id").limit(1),
     () => supabase.from("ai_analyses").select("id,bottlenecks").limit(1),
   ];
 

@@ -24,10 +24,30 @@ export interface WebsiteFacts {
   copyrightYear: number | null;
   hasViewport: boolean;
   technologies: string[];
+
+  // Campos acrescentados na avaliação de presença digital. Snapshots antigos
+  // não têm esses campos: a avaliação trata a ausência como "não medido".
+  /** Tempo (ms) até o servidor entregar a página inicial. */
+  loadMs?: number | null;
+  /** Tamanho do HTML da página inicial, em bytes. */
+  pageBytes?: number | null;
+  hasStructuredData?: boolean;
+  hasSocialPreview?: boolean;
+  hasPrivacyLink?: boolean;
+  /** A página sugere venda online (carrinho, comprar, checkout). */
+  sellsOnline?: boolean;
+  /** A página sugere agendamento/reserva online. */
+  hasBooking?: boolean;
 }
 
 const CTA_PATTERN =
   /(agende|agendar|agendamento|or[cç]amento|fale conosco|fale com|entre em contato|solicite|solicitar|reserv|comprar|whatsapp|chame)/i;
+
+const ECOMMERCE_PATTERN =
+  /(adicionar ao carrinho|add to cart|\bcarrinho\b|\bcheckout\b|finalizar compra|comprar agora|\bmeu carrinho\b)/i;
+
+const BOOKING_PATTERN =
+  /(agendar (consulta|hor[aá]rio|visita|atendimento)|agende (sua|seu|uma)|marque (sua|seu|uma)|reservar (mesa|hor[aá]rio)|agendamento online|calend[aá]rio de agendamento)/i;
 
 const PHONE_PATTERN =
   /(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g;
@@ -186,6 +206,19 @@ export function extractWebsiteFacts(
       html,
       $('meta[name="generator"]').attr("content"),
     ),
+    loadMs: null,
+    pageBytes: html.length,
+    hasStructuredData: $('script[type="application/ld+json"]').length > 0,
+    hasSocialPreview: $('meta[property="og:title"], meta[property="og:image"]').length > 0,
+    hasPrivacyLink:
+      $("a[href]")
+        .map((_, el) => `${$(el).attr("href") ?? ""} ${$(el).text()}`)
+        .get()
+        .some((t) => /(privacidade|privacy|lgpd|pol[ií]tica de dados)/i.test(t)),
+    sellsOnline:
+      ECOMMERCE_PATTERN.test(bodyText) ||
+      /(woocommerce|cdn\.shopify\.com|nuvemshop|lojaintegrada|vtex)/i.test(html),
+    hasBooking: BOOKING_PATTERN.test(bodyText),
   };
 }
 
@@ -214,6 +247,13 @@ export function failedWebsiteFacts(
     copyrightYear: null,
     hasViewport: false,
     technologies: [],
+    loadMs: null,
+    pageBytes: null,
+    hasStructuredData: false,
+    hasSocialPreview: false,
+    hasPrivacyLink: false,
+    sellsOnline: false,
+    hasBooking: false,
   };
 }
 
@@ -232,5 +272,8 @@ export function mergeWebsiteFacts(
     ctas: union(home.ctas, extra.ctas).slice(0, 10),
     formsCount: Math.max(home.formsCount, extra.formsCount),
     socialLinks: { ...extra.socialLinks, ...home.socialLinks },
+    hasPrivacyLink: !!(home.hasPrivacyLink || extra.hasPrivacyLink),
+    sellsOnline: !!(home.sellsOnline || extra.sellsOnline),
+    hasBooking: !!(home.hasBooking || extra.hasBooking),
   };
 }

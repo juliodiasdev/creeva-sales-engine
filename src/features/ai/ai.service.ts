@@ -8,6 +8,7 @@ import {
   listSignalsRepository,
 } from "../enrichment/enrichment.repository";
 
+import { getPresence } from "../presence/presence.service";
 import { getSetting } from "../settings/settings.service";
 
 import { openaiChatJson } from "./openai.client";
@@ -55,10 +56,11 @@ async function buildContext(companyId: number) {
 
   if (!company) throw new Error("Empresa não encontrada.");
 
-  const [signals, score, snapshot] = await Promise.all([
+  const [signals, score, snapshot, presence] = await Promise.all([
     listSignalsRepository(companyId),
     getLatestScoreRepository(companyId),
     getLatestSnapshotRepository(companyId),
+    getPresence(companyId),
   ]);
 
   return {
@@ -86,6 +88,11 @@ async function buildContext(companyId: number) {
         tem_whatsapp: snapshot.whatsappLinks.length > 0,
         tecnologias: snapshot.technologies,
         redes_sociais: Object.keys(snapshot.socialLinks),
+      },
+      presenca_digital: presence && {
+        nivel: presence.report.level,
+        nota: presence.report.score,
+        lacunas: presence.report.gaps.slice(0, 8).map((g) => `${g.label}: ${g.detail}`),
       },
       sinais: signals.map((s) => ({
         tipo: s.type,

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { LEVEL_LABEL, MOMENT_LABEL } from "../features/presence/presence.engine";
+import { MomentBadge } from "../features/presence/PresencePanel";
 import { FichaPanel, StatusBadge, StatusLegend } from "../features/enrichment/FichaPanel";
 import { CORE_KEYS, FICHA_LABEL, loadListFicha } from "../features/enrichment/ficha.service";
 import type { ListFichaRow } from "../features/enrichment/ficha.service";
@@ -66,6 +68,7 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
   const [matrix, setMatrix] = useState<ListFichaRow[]>([]);
   const [fichaId, setFichaId] = useState<number | null>(null);
   const [onlyGaps, setOnlyGaps] = useState(false);
+  const [onlyReady, setOnlyReady] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -376,14 +379,25 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
               <h2>Dados de cada empresa</h2>
             </div>
 
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={onlyGaps}
-                onChange={(e) => setOnlyGaps(e.target.checked)}
-              />
-              <span>Só empresas com dados faltando</span>
-            </label>
+            <div>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={onlyGaps}
+                  onChange={(e) => setOnlyGaps(e.target.checked)}
+                />
+                <span>Só empresas com dados faltando</span>
+              </label>
+
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={onlyReady}
+                  onChange={(e) => setOnlyReady(e.target.checked)}
+                />
+                <span>Só "{MOMENT_LABEL.READY}" ({matrix.filter((m) => m.presence?.moment === "READY").length})</span>
+              </label>
+            </div>
           </div>
 
           <StatusLegend />
@@ -399,6 +413,8 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
                     </th>
                   ))}
                   <th scope="col">Completo</th>
+                  <th scope="col">Presença digital</th>
+                  <th scope="col">Momento</th>
                   <th scope="col">Sugestões</th>
                   <th scope="col" />
                 </tr>
@@ -406,6 +422,7 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
               <tbody>
                 {matrix
                   .filter((m) => !onlyGaps || m.ok < m.total)
+                  .filter((m) => !onlyReady || m.presence?.moment === "READY")
                   .map((m) => (
                     <tr key={m.companyId}>
                       <th scope="row">{m.name}</th>
@@ -417,6 +434,17 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
                       <td>
                         {m.ok}/{m.total}
                       </td>
+                      <td>
+                        {m.presence ? (
+                          <>
+                            {LEVEL_LABEL[m.presence.level]}
+                            {m.presence.score !== null ? ` (${m.presence.score})` : ""}
+                          </>
+                        ) : (
+                          <span className="muted">Não avaliada</span>
+                        )}
+                      </td>
+                      <td>{m.presence ? <MomentBadge moment={m.presence.moment} /> : "—"}</td>
                       <td>{m.pendingSuggestions > 0 ? `${m.pendingSuggestions} a revisar` : "—"}</td>
                       <td>
                         <button type="button" className="secondary" onClick={() => setFichaId(m.companyId)}>

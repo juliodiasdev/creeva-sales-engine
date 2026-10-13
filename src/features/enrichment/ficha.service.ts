@@ -11,6 +11,8 @@ import { formatPhone } from "../../lib/format";
 import { isGenericHost, normalizeDomain, normalizePhone, socialProfile } from "../../lib/normalize";
 import { label, SIGNAL_LABEL, SOURCE_LABEL } from "../../lib/labels";
 
+import { listPresenceSummaries } from "../presence/presence.service";
+import type { PresenceLevel, SaleMoment } from "../presence/presence.engine";
 import { listSignalsRepository } from "./enrichment.repository";
 import {
   listFindingsForCompanies,
@@ -351,15 +353,18 @@ export interface ListFichaRow {
   ok: number;
   total: number;
   pendingSuggestions: number;
+  /** Presença digital já avaliada (null = ainda não avaliada). */
+  presence: { score: number | null; level: PresenceLevel; moment: SaleMoment } | null;
 }
 
 export async function loadListFicha(listId: number): Promise<ListFichaRow[]> {
   const companies = await listCompaniesOfListRepository(listId);
   const ids = companies.map((c) => Number(c.id));
 
-  const [channels, findings] = await Promise.all([
+  const [channels, findings, presence] = await Promise.all([
     listChannelsForCompanies(ids),
     listFindingsForCompanies(ids),
+    listPresenceSummaries(ids),
   ]);
 
   return companies.map((company) => {
@@ -378,6 +383,7 @@ export async function loadListFicha(listId: number): Promise<ListFichaRow[]> {
       ok,
       total,
       pendingSuggestions: found.filter((f) => f.status === "SUGGESTED").length,
+      presence: presence.get(Number(company.id)) ?? null,
     };
   });
 }

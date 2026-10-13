@@ -22,6 +22,8 @@ import type { StoredChannel } from "../contacts/channels.repository";
 import { listApproachesForCompanies } from "../contacts/approaches.repository";
 import type { StoredApproach } from "../contacts/approaches.repository";
 import { fetchByIds } from "../../lib/store";
+import { listPresenceSummaries } from "../presence/presence.service";
+import type { SaleMoment } from "../presence/presence.engine";
 
 /** Etapas do processo de uma empresa dentro de uma lista. */
 export interface ListStats {
@@ -73,6 +75,8 @@ export interface ListWithStats {
   list: ProspectList;
   stats: ListStats;
   next: NextStep;
+  /** Empresas já avaliadas em que é "hora de vender" (presença digital). */
+  readyToSell: number;
 }
 
 /** O que fazer agora nesta lista (guia o processo em ciclo). */
@@ -144,10 +148,25 @@ export async function loadListsWithStats(): Promise<ListWithStats[]> {
     byList.set(id, [...(byList.get(id) ?? []), s]);
   }
 
-  return lists.map((list) => {
-    const stats = countStages(byList.get(Number(list.id)) ?? []);
+  // "Hora de vender": empresas ainda não descartadas, já avaliadas na presença digital.
+  const presence = await listPresenceSummaries(
+    stages.filter((s) => s.list_id !== null).map((s) => Number(s.id)),
+  );
 
-    return { list, stats, next: nextStep(stats) };
+  return lists.map((list) => {
+    const members = byList.get(Number(list.id)) ?? [];
+    const stats = countStages(members);
+
+    return {
+      list,
+      stats,
+      next: nextStep(stats),
+      readyToSell: members.filter(
+        (m) =>
+          m.lead_status !== "DISQUALIFIED" &&
+          presence.get(Number(m.id))?.moment === "READY",
+      ).length,
+    };
   });
 }
 
@@ -156,13 +175,15 @@ export interface ListItem {
   channels: StoredChannel[];
   approaches: StoredApproach[];
   score: number | null;
+  /** Momento da presença digital (null = ainda não avaliada). */
+  moment: SaleMoment | null;
 }
 
 export async function loadListItems(listId: number): Promise<ListItem[]> {
   const companies = await listCompaniesOfListRepository(listId);
   const ids = companies.map((c) => Number(c.id));
 
-  const [channels, approaches, scores] = await Promise.all([
+  const [channels, approaches, scores, presence] = await Promise.all([
     listChannelsForCompanies(ids),
     listApproachesForCompanies(ids),
     fetchByIds<{ id: number; company_id: number; total: number }>(
@@ -171,6 +192,7 @@ export async function loadListItems(listId: number): Promise<ListItem[]> {
       "company_id",
       ids,
     ),
+    listPresenceSummaries(ids),
   ]);
 
   const latest = new Map<number, { id: number; total: number }>();
@@ -191,6 +213,7 @@ export async function loadListItems(listId: number): Promise<ListItem[]> {
     channels: channels.filter((c) => Number(c.company_id) === Number(company.id)),
     approaches: approaches.filter((a) => Number(a.company_id) === Number(company.id)),
     score: latest.get(Number(company.id))?.total ?? null,
+    moment: presence.get(Number(company.id))?.moment ?? null,
   }));
 }
 
@@ -273,7 +296,10 @@ export async function startOutreach(ids: number[]): Promise<BulkResult> {
   return { done, skipped: skipped + failed, suppressed: blocked.size };
 }
 
-/** Enriquecidas com pontuação >= mínimo configurado (sugestão, não decisão). */
+/**
+ * Sugestão (não decisão): enriquecidas em que é "hora de vender" pela presença
+ * digital; sem avaliação, vale a pontuação mínima configurada.
+ */
 export async function recommendedToQualify(
   items: ListItem[],
 ): Promise<number[]> {
@@ -283,8 +309,9 @@ export async function recommendedToQualify(
     .filter(
       (i) =>
         i.company.lead_status === "ENRICHED" &&
-        i.score !== null &&
-        i.score >= min,
+        (i.moment !== null
+          ? i.moment === "READY"
+          : i.score !== null && i.score >= min),
     )
     .map((i) => Number(i.company.id));
 }

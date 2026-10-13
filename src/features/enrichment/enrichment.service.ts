@@ -31,6 +31,7 @@ import type { ServiceKey } from "../services/services.service";
 
 import { planCompanyWithAi } from "../ai/ai.service";
 import { searchCompanyWithAi } from "./aisearch.service";
+import { assessAndSavePresence } from "../presence/presence.service";
 import { crawlWebsite } from "./website.crawler";
 import type { WebsiteFacts } from "./website.facts";
 
@@ -130,6 +131,9 @@ export async function enrichCompany(
   });
 
   await saveScoreRepository(companyId, score);
+
+  // Avaliação da presença digital com os dados que acabaram de ser coletados.
+  await assessAndSavePresence(companyId, new Date());
 
   // Serviços da Creava mais adequados + abordagens por canal (templates).
   const services = await listServices(true);

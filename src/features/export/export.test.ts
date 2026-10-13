@@ -113,3 +113,27 @@ describe("buildWorkbook", () => {
     expect(wb.getWorksheet("Resumo")!.getCell("A1").value).toBe("Creava Digital - Agência");
   });
 });
+
+describe("planilha: presença digital", () => {
+  it("cria a aba só quando há empresas avaliadas, com o momento e as lacunas", async () => {
+    const base = buildExportData(input());
+
+    const without = new ExcelJS.Workbook();
+    await without.xlsx.load(await buildWorkbook(base) as never);
+    expect(without.getWorksheet("Presença digital")).toBeUndefined();
+
+    base.presence = [
+      { company: "Odonto Alfa", level: "Presença básica", score: 38, moment: "Hora de vender", confidence: 80, position: "Online, mas frágil.", gaps: "HTTPS: sem cadeado", offers: "Sites e lojas virtuais: sem HTTPS" },
+      { company: "Myrelief", level: "Presença avançada", score: 88, moment: "Poucas brechas", confidence: 95, position: "Forte.", gaps: "", offers: "" },
+    ];
+
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await buildWorkbook(base) as never);
+    const ws = wb.getWorksheet("Presença digital")!;
+
+    expect(ws.getRow(1).values).toEqual(expect.arrayContaining(["Momento", "Principais lacunas", "O que vender (e por quê)"]));
+    expect(ws.getRow(2).getCell(1).value).toBe("Odonto Alfa");
+    expect(ws.getRow(2).getCell(2).value).toBe("Hora de vender");
+    expect(ws.getRow(3).getCell(7).value).toBe("—");
+  });
+});

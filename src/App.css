@@ -1156,3 +1156,13 @@ code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-
 .ficha-table td { overflow-wrap: anywhere; }
 .ficha-table.matrix { table-layout: auto; }
 .ficha-table.matrix th, .ficha-table.matrix td { width: auto; }
+
+/* ---------- presença digital ---------- */
+.fs-unknown { color: var(--muted); border-color: var(--line); }
+.moment-box { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); margin: 8px 0; }
+.moment-ready { border-color: #2f6f4b; }
+.moment-needs_data { border-color: #7a6320; }
+.presence-table th:nth-child(1) { width: 24%; }
+.presence-table th:nth-child(2) { width: 14%; }
+.presence-table th:nth-child(3) { width: 40%; }
+.presence-table th:nth-child(4) { width: 22%; }

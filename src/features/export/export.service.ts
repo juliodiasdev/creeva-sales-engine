@@ -15,6 +15,8 @@ import type { StoredApproach } from "../contacts/approaches.repository";
 import { STATUS_LABEL } from "../prospects/prospect.labels";
 
 import { cleanBusinessName } from "./names";
+import { LEVEL_LABEL, MOMENT_LABEL } from "../presence/presence.engine";
+import type { PresenceReport } from "../presence/presence.engine";
 
 export interface ExportCompany {
   id: number;
@@ -55,9 +57,25 @@ export interface ExportApproach {
   message: string;
 }
 
+export interface ExportPresence {
+  company: string;
+  level: string;
+  score: number | null;
+  moment: string;
+  /** Parcela do que pôde ser medido, em %. */
+  confidence: number;
+  position: string;
+  /** Até 3 principais lacunas, uma por linha. */
+  gaps: string;
+  /** Serviço da Creava e o motivo real, um por linha. */
+  offers: string;
+}
+
 export interface ExportData {
   companies: ExportCompany[];
   approaches: ExportApproach[];
+  /** Avaliação da presença digital das empresas já avaliadas. */
+  presence?: ExportPresence[];
   /** Nome da lista exportada (vazio = base geral). */
   listName?: string;
 }
@@ -262,7 +280,7 @@ export async function loadExportData(listId?: number): Promise<ExportData> {
         .range(from, to) as never,
     );
 
-  const [companies, channels, approaches, scores, prospects, sources, services] =
+  const [companies, channels, approaches, scores, prospects, sources, services, presenceRows] =
     await Promise.all([
       page<Company>("companies", "*"),
       page<StoredChannel>("company_channels", "*"),
@@ -271,6 +289,7 @@ export async function loadExportData(listId?: number): Promise<ExportData> {
       page<{ company_id: number; status: string }>("prospects", "id,company_id,status"),
       page<{ company_id: number; source_type: string }>("company_sources", "id,company_id,source_type"),
       page<{ key: string; name: string }>("services", "key,name", "key"),
+      page<{ company_id: number; report: string }>("presence_reports", "id,company_id,report"),
     ]);
 
   const latestScore = new Map<number, number>();
@@ -301,6 +320,44 @@ export async function loadExportData(listId?: number): Promise<ExportData> {
     sources: firstSource,
     serviceNames: new Map(services.map((s) => [s.key, s.name])),
   });
+
+  const serviceName = new Map(services.map((x) => [x.key, x.name]));
+  const nameOf = new Map(scope.map((c) => [Number(c.id), cleanBusinessName(c.name)]));
+
+  data.presence = presenceRows
+    .filter((r) => inScope.has(Number(r.company_id)))
+    .flatMap((r): ExportPresence[] => {
+      try {
+        const report = JSON.parse(r.report) as PresenceReport;
+
+        return [
+          {
+            company: nameOf.get(Number(r.company_id)) ?? "",
+            level: LEVEL_LABEL[report.level],
+            score: report.score,
+            moment: MOMENT_LABEL[report.moment],
+            confidence: Math.round(report.confidence * 100),
+            position: report.position,
+            gaps: report.gaps
+              .slice(0, 3)
+              .map((g) => `${g.label}: ${g.detail}`)
+              .join("\n"),
+            offers: report.offers
+              .slice(0, 3)
+              .map((o) => `${serviceName.get(o.service) ?? o.service}: ${o.reasons[0] ?? ""}`)
+              .join("\n"),
+          },
+        ];
+      } catch {
+        return [];
+      }
+    })
+    .sort(
+      (a, b) =>
+        Number(b.moment === MOMENT_LABEL.READY) - Number(a.moment === MOMENT_LABEL.READY) ||
+        (a.score ?? 101) - (b.score ?? 101) ||
+        a.company.localeCompare(b.company, "pt-BR"),
+    );
 
   if (listId !== undefined) {
     const list = unwrap(

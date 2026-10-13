@@ -421,6 +421,63 @@ function addApproaches(wb: ExcelJS.Workbook, data: ExportData) {
   }
 }
 
+function addPresence(wb: ExcelJS.Workbook, data: ExportData) {
+  const rows = data.presence ?? [];
+
+  const ws = wb.addWorksheet("Presença digital", {
+    properties: { tabColor: { argb: "FFF3C969" } },
+    views: [{ state: "frozen", ySplit: 1, showGridLines: false }],
+    pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+
+  const cols: Col[] = [
+    { header: "Empresa", width: 34 },
+    { header: "Momento", width: 16 },
+    { header: "Nível", width: 22 },
+    { header: "Nota", width: 8 },
+    { header: "Dados medidos", width: 14 },
+    { header: "Posição da empresa", width: 52 },
+    { header: "Principais lacunas", width: 60 },
+    { header: "O que vender (e por quê)", width: 60 },
+  ];
+
+  ws.columns = cols.map((c) => ({ width: c.width }));
+  cols.forEach((c, i) => (ws.getRow(1).getCell(i + 1).value = c.header));
+  styleHeader(ws.getRow(1));
+
+  rows.forEach((r, i) => {
+    const row = ws.getRow(i + 2);
+    const colors =
+      r.moment === "Hora de vender"
+        ? { bg: "FFC6F0D2", fg: "FF145A32" }
+        : r.moment === "Faltam dados"
+          ? { bg: "FFFFF1B8", fg: "FF7A5C00" }
+          : { bg: "FFE9EAEC", fg: "FF555555" };
+
+    row.values = [r.company, r.moment, r.level, r.score ?? "—", `${r.confidence}%`, r.position, r.gaps || "—", r.offers || "—"];
+    row.height = Math.max(rowHeight(r.gaps, 60), rowHeight(r.offers, 60), rowHeight(r.position, 52), 24);
+
+    row.eachCell({ includeEmpty: true }, (cell, n) => {
+      if (n > cols.length) return;
+      cell.border = thin();
+      cell.fill = fill(i % 2 ? ZEBRA : "FFFFFFFF");
+      cell.font = { size: 10.5, bold: n === 1 };
+      cell.alignment = {
+        vertical: "top",
+        wrapText: n === 1 || n >= 6,
+        horizontal: n >= 2 && n <= 5 ? "center" : "left",
+      };
+    });
+
+    row.getCell(2).fill = fill(colors.bg);
+    row.getCell(2).font = { size: 10.5, bold: true, color: { argb: colors.fg } };
+  });
+
+  if (rows.length > 0) {
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: rows.length + 1, column: cols.length } };
+  }
+}
+
 const byPriority = (a: ExportCompany, b: ExportCompany) =>
   Number(!!b.prospectStatus) - Number(!!a.prospectStatus) ||
   (b.score ?? -1) - (a.score ?? -1) ||
@@ -456,6 +513,8 @@ export async function buildWorkbook(
     sorted.filter((c) => !c.hasContact),
     true,
   );
+
+  if ((data.presence?.length ?? 0) > 0) addPresence(wb, data);
 
   addApproaches(wb, data);
 

@@ -68,7 +68,7 @@ export function ListsPage({ onOpenList, onNewSearch }: Props) {
         </div>
       ) : (
         <div className="tasks-list">
-          {visible.map(({ list, stats, next }) => (
+          {visible.map(({ list, stats, next, readyToSell }) => (
             <article className="task-item" key={list.id}>
               <div className="task-body">
                 <strong
@@ -86,6 +86,12 @@ export function ListsPage({ onOpenList, onNewSearch }: Props) {
                   {stats.qualified} qualificadas · {stats.ready} em abordagem ·{" "}
                   {stats.disqualified} descartadas
                 </p>
+                {readyToSell > 0 && (
+                  <p>
+                    <strong>{readyToSell}</strong> empresa(s) com presença digital avaliada e{" "}
+                    <strong>prontas para vender</strong>.
+                  </p>
+                )}
                 <p className="muted">
                   Próximo passo: <strong>{next.title}</strong> — {next.detail}
                 </p>

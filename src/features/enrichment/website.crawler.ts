@@ -19,9 +19,10 @@ function withProtocol(url: string): string {
 
 async function fetchHtml(
   url: string,
-): Promise<{ html: string; finalUrl: string; status: number } | { error: string; status: number | null; finalUrl: string | null }> {
+): Promise<{ html: string; finalUrl: string; status: number; ms: number } | { error: string; status: number | null; finalUrl: string | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const started = Date.now();
 
   try {
     const response = await httpFetch(url, {
@@ -40,10 +41,13 @@ async function fetchHtml(
       return { error: `HTTP ${response.status}`, status: response.status, finalUrl };
     }
 
+    const html = (await response.text()).slice(0, MAX_HTML_BYTES);
+
     return {
-      html: (await response.text()).slice(0, MAX_HTML_BYTES),
+      html,
       finalUrl,
       status: response.status,
+      ms: Date.now() - started,
     };
   } catch (err) {
     return {
@@ -75,11 +79,14 @@ export async function crawlWebsite(
     };
   }
 
-  const facts = extractWebsiteFacts(home.html, {
-    url,
-    finalUrl: home.finalUrl,
-    httpStatus: home.status,
-  });
+  const facts = {
+    ...extractWebsiteFacts(home.html, {
+      url,
+      finalUrl: home.finalUrl,
+      httpStatus: home.status,
+    }),
+    loadMs: home.ms,
+  };
 
   if (facts.contactPageUrl && facts.contactPageUrl !== home.finalUrl) {
     const contact = await fetchHtml(facts.contactPageUrl);

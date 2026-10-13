@@ -169,3 +169,20 @@ describe("legacy companies are organised into lists once", () => {
     expect(await runRepairsOnce()).toBeNull();
   });
 });
+
+describe("recomendação baseada na presença digital", () => {
+  it("usa o momento de venda quando a presença foi avaliada e a nota só quando não foi", async () => {
+    const item = (id: number, score: number | null, moment: "READY" | "NEEDS_DATA" | "NO_GAP" | null) =>
+      ({ company: { id, lead_status: "ENRICHED" }, channels: [], approaches: [], score, moment }) as never;
+
+    const ids = await recommendedToQualify([
+      item(1, 90, "NEEDS_DATA"), // nota alta, mas faltam dados: não recomenda
+      item(2, 20, "READY"), // nota baixa, mas é a hora de vender: recomenda
+      item(3, 90, "NO_GAP"),
+      item(4, 80, null), // sem avaliação: vale a nota
+      item(5, 10, null),
+    ]);
+
+    expect(ids).toEqual([2, 4]);
+  });
+});

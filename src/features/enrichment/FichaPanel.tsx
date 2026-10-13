@@ -8,6 +8,7 @@ import { decideFinding, searchCompanyWithAi } from "./aisearch.service";
 import { loadFicha } from "./ficha.service";
 import type { Ficha, FichaRow, FichaStatus } from "./ficha.service";
 import type { StoredFinding } from "./findings.repository";
+import { PresencePanel } from "../presence/PresencePanel";
 
 export const STATUS_TEXT: Record<FichaStatus, string> = {
   OK: "Tem",
@@ -172,6 +173,9 @@ export function FichaPanel({
   );
 
   return (
+    <>
+      <PresencePanel companyId={companyId} onChanged={onChanged} />
+
     <section className="panel ficha">
       <div className="panel-title">
         <div>
@@ -271,5 +275,6 @@ export function FichaPanel({
         )}
       </div>
     </section>
+    </>
   );
 }
