@@ -34,6 +34,7 @@ const NEED_WEIGHTS: Record<SignalType, number> = {
   WEAK_SOCIAL_PROFILE: 4,
   SLOW_SITE: 4,
   OLD_BANNERS: 3,
+  AUTOMATION_GAP: 3,
 };
 
 const cap = (n: number) => Math.max(0, Math.min(25, n));

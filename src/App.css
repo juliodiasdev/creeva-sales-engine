@@ -1193,3 +1193,11 @@ code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-
   .visual-item { grid-template-columns: 1fr; }
   .visual-item .visual-hint, .visual-item input[type="text"], .visual-item .seg { grid-column: 1; grid-row: auto; }
 }
+
+/* Potencial de automação */
+.automation-table th:nth-child(1) { width: 20%; }
+.automation-table th:nth-child(2) { width: 16%; }
+.automation-table th:nth-child(3) { width: 36%; }
+.automation-table th:nth-child(4) { width: 28%; }
+.automation-table tbody th { white-space: normal; }
+.automation-ask { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); padding: 10px 12px; margin: 10px 0; display: grid; gap: 4px; }

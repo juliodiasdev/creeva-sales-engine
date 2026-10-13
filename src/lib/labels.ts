@@ -83,6 +83,7 @@ export const SIGNAL_LABEL: Record<string, string> = {
   NO_BANNERS: "Sem banners ou artes de divulgação",
   OLD_BANNERS: "Banners antigos ou amadores",
   WEAK_SOCIAL_PROFILE: "Perfil fraco nas redes",
+  AUTOMATION_GAP: "Automação não encontrada (a confirmar)",
 };
 
 export const SCORE_DIMENSION_LABEL: Record<string, string> = {

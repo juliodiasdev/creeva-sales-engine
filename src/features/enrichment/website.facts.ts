@@ -45,6 +45,20 @@ export interface WebsiteFacts {
   legacyCues?: string[];
   /** Imagens da página inicial. */
   images?: { total: number; withAlt: number; optimized: number };
+  /**
+   * Ferramentas de automação que o CÓDIGO da página carrega (chat, agenda, pagamento, CRM,
+   * loja, pedidos). Só vale o que foi encontrado: ausência não prova que a empresa não usa.
+   */
+  tools?: DetectedTool[];
+  /** A página usa Google Tag Manager, que pode carregar ferramentas invisíveis a esta leitura. */
+  hasTagManager?: boolean;
+}
+
+export type ToolCategory = "CHAT" | "BOOKING" | "PAYMENT" | "CRM" | "ECOMMERCE" | "DELIVERY";
+
+export interface DetectedTool {
+  category: ToolCategory;
+  name: string;
 }
 
 const CTA_PATTERN =
@@ -58,6 +72,98 @@ const BOOKING_PATTERN =
 
 const PHONE_PATTERN =
   /(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g;
+
+/** Nome inteiro da ferramenta: não casa no meio de outra palavra ("local.com" não é "cal.com"). */
+const edge = (host: string) => new RegExp(`(?:^|[^a-z0-9-])(?:${host})(?:[^a-z0-9]|$)`);
+
+/**
+ * Ferramentas reconhecidas pelo NOME/endereço próprio delas em scripts, iframes, links e
+ * formulários. Texto visível da página nunca conta (ex.: "aceitamos PayPal" não é a ferramenta).
+ */
+const TOOL_PATTERNS: [ToolCategory, string, RegExp][] = [
+  ["CHAT", "Tawk.to", edge("tawk\\.to")],
+  ["CHAT", "JivoChat", edge("jivosite\\.com|jivochat\\.[a-z.]+")],
+  ["CHAT", "Tidio", edge("tidio\\.co|tidiochat\\.com")],
+  ["CHAT", "Crisp", edge("crisp\\.chat")],
+  ["CHAT", "Intercom", edge("intercom\\.io|intercomcdn\\.com")],
+  ["CHAT", "Zendesk", edge("zdassets\\.com|zopim\\.com|zendesk\\.com")],
+  ["CHAT", "Drift", edge("drift\\.com|driftt\\.com")],
+  ["CHAT", "Octadesk", edge("octadesk\\.[a-z.]+")],
+  ["CHAT", "Chatwoot", edge("chatwoot\\.[a-z.]+")],
+  ["CHAT", "Landbot", edge("landbot\\.io")],
+  ["CHAT", "ManyChat", edge("manychat\\.com")],
+  ["BOOKING", "Calendly", edge("calendly\\.com")],
+  ["BOOKING", "Cal.com", edge("cal\\.com")],
+  ["BOOKING", "Simples Agenda", edge("simplesagenda\\.[a-z.]+")],
+  ["BOOKING", "Trinks", edge("trinks\\.com")],
+  ["BOOKING", "Doctoralia", edge("doctoralia\\.[a-z.]+")],
+  ["BOOKING", "Booksy", edge("booksy\\.com")],
+  ["BOOKING", "Setmore", edge("setmore\\.com")],
+  ["BOOKING", "Acuity Scheduling", edge("acuityscheduling\\.com")],
+  ["BOOKING", "Reservio", edge("reservio\\.com")],
+  ["PAYMENT", "Mercado Pago", edge("mercadopago\\.[a-z.]+|mpago\\.la")],
+  ["PAYMENT", "PagBank/PagSeguro", edge("pagseguro\\.[a-z.]+|pagbank\\.[a-z.]+|pag\\.ae")],
+  ["PAYMENT", "Stripe", edge("stripe\\.com")],
+  ["PAYMENT", "Pagar.me", edge("pagar\\.me")],
+  ["PAYMENT", "Asaas", edge("asaas\\.com")],
+  ["PAYMENT", "PayPal", edge("paypal\\.com|paypal\\.me")],
+  ["PAYMENT", "Hotmart", edge("hotmart\\.com")],
+  ["PAYMENT", "Eduzz", edge("eduzz\\.com")],
+  ["PAYMENT", "Kiwify", edge("kiwify\\.com(?:\\.br)?")],
+  ["CRM", "RD Station", edge("rdstation\\.[a-z.]+|rdstation")],
+  ["CRM", "HubSpot", edge("hubspot\\.com|hs-scripts\\.com|hsforms\\.(?:net|com)|hs-analytics\\.net")],
+  ["CRM", "ActiveCampaign", edge("activecampaign\\.com|trackcmp\\.net")],
+  ["CRM", "Mailchimp", edge("mailchimp\\.com|list-manage\\.com|chimpstatic\\.com")],
+  ["CRM", "Pipedrive", edge("pipedrive\\.com")],
+  ["CRM", "Kommo/amoCRM", edge("kommo\\.com|amocrm\\.[a-z.]+")],
+  ["CRM", "Zoho", edge("zohopublic\\.[a-z.]+|zohocrm\\.[a-z.]+|zohoforms\\.[a-z.]+|zohocampaigns\\.[a-z.]+")],
+  ["CRM", "LeadLovers", edge("leadlovers\\.com")],
+  ["CRM", "Mautic", edge("mautic\\.[a-z.]+")],
+  ["CRM", "Klaviyo", edge("klaviyo\\.com")],
+  ["CRM", "Brevo (Sendinblue)", edge("sendinblue\\.com|brevo\\.com")],
+  ["ECOMMERCE", "Shopify", edge("cdn\\.shopify\\.com|myshopify\\.com")],
+  ["ECOMMERCE", "WooCommerce", edge("woocommerce")],
+  ["ECOMMERCE", "Nuvemshop", edge("nuvemshop\\.[a-z.]+|lojanuvem\\.[a-z.]+|mitiendanube\\.com|tiendanube\\.com")],
+  ["ECOMMERCE", "Loja Integrada", edge("lojaintegrada\\.com\\.br")],
+  ["ECOMMERCE", "VTEX", edge("vtex[a-z]*\\.[a-z.]+")],
+  ["ECOMMERCE", "Yampi", edge("yampi\\.[a-z.]+")],
+  ["ECOMMERCE", "Bagy", edge("bagy\\.com\\.br")],
+  ["DELIVERY", "iFood", edge("ifood\\.com\\.br")],
+  ["DELIVERY", "Anota AI", edge("anota\\.ai")],
+  ["DELIVERY", "Goomer", edge("goomer\\.[a-z.]+")],
+  ["DELIVERY", "Menu Dino", edge("menudino\\.[a-z.]+")],
+  ["DELIVERY", "Cardápio Web", edge("cardapioweb\\.[a-z.]+")],
+];
+
+/** Endereços carregados pela página (scripts, iframes, links, formulários) + código dos scripts. */
+export function detectTools($: cheerio.CheerioAPI): DetectedTool[] {
+  const refs: string[] = [];
+
+  $("script[src], iframe[src], link[href], a[href], form[action]").each((_, el) => {
+    const node = $(el);
+
+    refs.push(
+      node.attr("src") ?? "",
+      node.attr("href") ?? "",
+      node.attr("action") ?? "",
+    );
+  });
+
+  const inline = $("script:not([src])")
+    .map((_, el) => $(el).html() ?? "")
+    .get()
+    .join("\n")
+    .slice(0, 400_000);
+
+  const haystack = `${refs.join("\n")}\n${inline}`.toLowerCase();
+  const found = new Map<string, DetectedTool>();
+
+  for (const [category, name, re] of TOOL_PATTERNS) {
+    if (re.test(haystack)) found.set(`${category}:${name}`, { category, name });
+  }
+
+  return [...found.values()];
+}
 
 /** Sinais objetivos de que o código da página é antigo. Não julga o visual. */
 export function detectLegacyCues(html: string, $: cheerio.CheerioAPI): string[] {
@@ -294,6 +400,8 @@ export function extractWebsiteFacts(
     hasBooking: BOOKING_PATTERN.test(bodyText),
     legacyCues: detectLegacyCues(html, $),
     images: imageStats($),
+    tools: detectTools($),
+    hasTagManager: /googletagmanager\.com\/(?:gtm\.js|ns\.html)/i.test(html),
   };
 }
 
@@ -331,6 +439,8 @@ export function failedWebsiteFacts(
     hasBooking: false,
     legacyCues: [],
     images: { total: 0, withAlt: 0, optimized: 0 },
+    tools: [],
+    hasTagManager: false,
   };
 }
 
@@ -352,5 +462,11 @@ export function mergeWebsiteFacts(
     hasPrivacyLink: !!(home.hasPrivacyLink || extra.hasPrivacyLink),
     sellsOnline: !!(home.sellsOnline || extra.sellsOnline),
     hasBooking: !!(home.hasBooking || extra.hasBooking),
+    tools: [
+      ...new Map(
+        [...(home.tools ?? []), ...(extra.tools ?? [])].map((t) => [`${t.category}:${t.name}`, t]),
+      ).values(),
+    ],
+    hasTagManager: !!(home.hasTagManager || extra.hasTagManager),
   };
 }

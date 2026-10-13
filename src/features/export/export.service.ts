@@ -16,6 +16,7 @@ import { STATUS_LABEL } from "../prospects/prospect.labels";
 
 import { cleanBusinessName } from "./names";
 import { LEVEL_LABEL, MOMENT_LABEL } from "../presence/presence.engine";
+import { AUTOMATION_LEVEL_LABEL } from "../automation/automation.engine";
 import type { PresenceReport } from "../presence/presence.engine";
 
 export interface ExportCompany {
@@ -69,6 +70,8 @@ export interface ExportPresence {
   gaps: string;
   /** Serviço da Creava e o motivo real, um por linha. */
   offers: string;
+  /** Potencial de automação: nível e o que foi (ou não) encontrado. Ausente em avaliações antigas. */
+  automation?: string;
 }
 
 export interface ExportData {
@@ -346,6 +349,9 @@ export async function loadExportData(listId?: number): Promise<ExportData> {
               .slice(0, 3)
               .map((o) => `${serviceName.get(o.service) ?? o.service}: ${o.reasons[0] ?? ""}`)
               .join("\n"),
+            automation: report.automation
+              ? `${AUTOMATION_LEVEL_LABEL[report.automation.level]}. ${report.automation.summary}`
+              : undefined,
           },
         ];
       } catch {

@@ -2,6 +2,8 @@ import type { Company } from "../companies/company.types";
 import type { WebsiteFacts } from "../enrichment/website.facts";
 import type { ServiceKey } from "../services/services.service";
 import { isGenericHost, normalizeDomain } from "../../lib/normalize";
+import { assessAutomation, automationGaps, automationReason } from "../automation/automation.engine";
+import type { AutomationReport } from "../automation/automation.engine";
 import {
   VISUAL_CHECKLIST,
   VISUAL_TARGET_LABEL,
@@ -13,7 +15,7 @@ import type { VisualReview, VisualTarget } from "../visual/visual.checklist";
  * só em dados reais coletados (Google Maps, site, canais). O que não foi
  * possível medir é marcado como UNKNOWN e NÃO entra na nota.
  */
-export const PRESENCE_VERSION = 2;
+export const PRESENCE_VERSION = 3;
 
 export type CheckStatus = "OK" | "WARN" | "FAIL" | "UNKNOWN";
 
@@ -93,6 +95,8 @@ export interface PresenceReport {
   notes: string[];
   /** Revisões visuais (Instagram, WhatsApp, site) que ainda faltam fazer. Ausente em relatórios antigos. */
   pending?: string[];
+  /** Potencial de automação (agenda, atendimento, vendas, cobrança…). Ausente em relatórios antigos. */
+  automation?: AutomationReport;
 }
 
 const DIMENSION_META: Record<DimensionKey, { label: string; weight: number }> = {
@@ -505,18 +509,24 @@ export function assessPresence(input: Input): PresenceReport {
     byService.set(g.service, offer);
   }
 
+  // "Hora de vender" só com lacuna medida ou conferida; hipótese de automação sozinha não basta.
+  const sellable = byService.size > 0;
+
+  // Automação: cada lacuna entra com o que foi encontrado e, quando só "não encontrado", marcada "a confirmar".
+  const automation = assessAutomation({ company, channels, facts, reviews: visualReviews });
+  const automationMissing = automationGaps(automation);
+
+  for (const area of automationMissing) {
+    const offer = byService.get(area.service) ?? { service: area.service, reasons: [], weight: 0 };
+    // Hipótese ("não encontrado") pesa menos que o que foi medido ou conferido.
+    offer.weight += area.weight * (area.state === "CONFIRMED_GAP" ? 1.5 : 0.5);
+    offer.reasons.push(automationReason(area));
+    byService.set(area.service, offer);
+  }
+
   const offers = [...byService.values()]
     .sort((a, b) => b.weight - a.weight)
     .map((o) => ({ ...o, reasons: o.reasons.slice(0, 4) }));
-
-  // Presença avançada sem lacunas de peso: o caminho é sistema/automação e suporte.
-  if (level === "ADVANCED" && offers.length === 0) {
-    offers.push({
-      service: "SISTEMA_AUTOMACAO",
-      reasons: ["Presença sólida: o ganho está em automatizar atendimento, agenda e relatórios."],
-      weight: 1,
-    });
-  }
 
   const blockers: string[] = [];
 
@@ -535,19 +545,24 @@ export function assessPresence(input: Input): PresenceReport {
   const moment: SaleMoment =
     blockers.length > 0 && !noPresence
       ? "NEEDS_DATA"
-      : offers.length > 0 && gaps.length > 0
+      : (sellable && gaps.length > 0) || automationMissing.some((a) => a.state === "CONFIRMED_GAP")
         ? "READY"
         : "NO_GAP";
 
+  // A frase só descreve o que foi medido: nota, lacunas e sinais de imagem defasada. Sem adjetivo solto.
+  const topGaps = gaps.slice(0, 3).map((g) => g.label);
+
   const position = noPresence
-    ? "Invisível na internet: depende do Google Maps e do boca a boca. Precisa existir online antes de qualquer otimização."
-    : level === "BASIC"
-      ? "Está online, mas de forma frágil: a base existe e falta estrutura para gerar contatos de forma previsível."
-      : level === "INTERMEDIATE"
-        ? dated.length > 0 && (score ?? 0) >= LEVEL_THRESHOLDS.INTERMEDIATE
-          ? "Presença estruturada, mas com a imagem defasada (site antigo, lento ou banners e perfis fracos): espaço claro para modernizar e vender design."
-          : "Boa base digital, com brechas claras na conversão e no atendimento que travam o crescimento."
-        : "Presença forte: o espaço está em automatizar o que já funciona e em manter tudo evoluindo.";
+    ? "Sem site próprio nem redes sociais encontrados: online, aparece apenas no Google Maps (até onde conseguimos verificar)."
+    : [
+        `${LEVEL_LABEL[level]}: ${score === null ? "nota ainda não calculada" : `nota ${score}/100`}.`,
+        dated.length > 0 && level !== "BASIC"
+          ? `O que foi medido indica imagem defasada (${dated.map((d) => d.label.toLowerCase()).join("; ")}).`
+          : null,
+        topGaps.length > 0
+          ? `Principais lacunas medidas: ${topGaps.join("; ")}.`
+          : "Nenhuma lacuna relevante nos pontos medidos.",
+      ].filter(Boolean).join(" ");
 
   return {
     version: PRESENCE_VERSION,
@@ -568,5 +583,6 @@ export function assessPresence(input: Input): PresenceReport {
       "Ferramentas carregadas por JavaScript (chat, agendamento, analytics) podem não aparecer na leitura do código.",
     ],
     pending,
+    automation,
   };
 }

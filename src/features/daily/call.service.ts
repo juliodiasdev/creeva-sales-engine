@@ -9,6 +9,9 @@ import { confirmOptOut } from "../agent/conversation.service";
 import { getLatestAnalysis, parseBottlenecks } from "../ai/ai.service";
 import type { AiBottleneck } from "../ai/ai.validation";
 import { isCompanySuppressed } from "../compliance/suppression.service";
+import { STATE_LABEL } from "../automation/automation.engine";
+import type { AutomationState } from "../automation/automation.engine";
+import { getPresence } from "../presence/presence.service";
 import { consolidateChannels } from "../contacts/consolidate";
 import { listChannelsRepository } from "../contacts/channels.repository";
 import type { StoredChannel } from "../contacts/channels.repository";
@@ -188,13 +191,19 @@ export interface CallDossier {
   /** Contato principal por tipo (um por canal), para ligar ou abrir o WhatsApp. */
   contacts: StoredChannel[];
   hasDiagnosis: boolean;
+  /**
+   * O que confirmar na conversa sobre automação. "Não encontrado" e "não dá para saber"
+   * entram como PERGUNTA: nunca como afirmação sobre a empresa.
+   */
+  automation: { area: string; state: AutomationState; stateLabel: string; found: string[]; question: string }[];
 }
 
 export async function loadCallDossier(companyId: number): Promise<CallDossier> {
-  const [analysis, channels, feedback] = await Promise.all([
+  const [analysis, channels, feedback, presence] = await Promise.all([
     getLatestAnalysis(companyId),
     listChannelsRepository(companyId),
     listBottleneckFeedback(companyId),
+    getPresence(companyId),
   ]);
 
   return {
@@ -206,5 +215,14 @@ export async function loadCallDossier(companyId: number): Promise<CallDossier> {
       verdict: feedback.get(b.title) ?? null,
     })),
     contacts: consolidateChannels(channels).main,
+    automation: (presence?.report.automation?.areas ?? [])
+      .filter((a) => a.state !== "NOT_APPLICABLE" && a.state !== "ALREADY")
+      .map((a) => ({
+        area: a.label,
+        state: a.state,
+        stateLabel: STATE_LABEL[a.state],
+        found: a.evidence.map((e) => e.text),
+        question: a.question,
+      })),
   };
 }

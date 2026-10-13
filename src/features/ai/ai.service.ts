@@ -9,6 +9,7 @@ import {
 } from "../enrichment/enrichment.repository";
 
 import { getPresence } from "../presence/presence.service";
+import { SOURCE_LABEL, STATE_LABEL } from "../automation/automation.engine";
 import { getSetting } from "../settings/settings.service";
 
 import { openaiChatJson } from "./openai.client";
@@ -48,6 +49,8 @@ const SYSTEM_RULES = `Você é um analista comercial da agência Creava Digital.
 Regras obrigatórias:
 - Use SOMENTE os fatos, sinais e evidências fornecidos no JSON. Nunca invente dados.
 - Se a evidência for insuficiente, diga isso e use confiança baixa.
+- Em "automacao", só "Já tem (encontrado)" e "Falta (você conferiu)" são fatos. "Não encontrado (a confirmar)", "Não dá para saber de fora" e as linhas "Típico do segmento" são HIPÓTESES: nunca afirme que a empresa "não tem" ou "faz manualmente"; escreva "não encontramos" e transforme a dúvida em pergunta para a conversa.
+- Nunca estime economia, horas poupadas, ganhos, prazos ou resultados.
 - Responda apenas com JSON válido, em português do Brasil.`;
 
 /** Contexto enviado à IA: fatos e sinais, nunca HTML bruto. */
@@ -93,6 +96,17 @@ async function buildContext(companyId: number) {
         nivel: presence.report.level,
         nota: presence.report.score,
         lacunas: presence.report.gaps.slice(0, 8).map((g) => `${g.label}: ${g.detail}`),
+      },
+      automacao: presence?.report.automation && {
+        nivel: presence.report.automation.level,
+        resumo: presence.report.automation.summary,
+        areas: presence.report.automation.areas
+          .filter((a) => a.state !== "NOT_APPLICABLE")
+          .map((a) => ({
+            area: a.label,
+            situacao: STATE_LABEL[a.state],
+            evidencias: a.evidence.map((e) => `${SOURCE_LABEL[e.source]}: ${e.text}`),
+          })),
       },
       sinais: signals.map((s) => ({
         tipo: s.type,

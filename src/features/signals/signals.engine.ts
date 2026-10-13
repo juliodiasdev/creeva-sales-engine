@@ -1,6 +1,8 @@
 import { isGenericHost } from "../../lib/normalize";
 import type { Company } from "../companies/company.types";
 import type { WebsiteFacts } from "../enrichment/website.facts";
+import { automationGaps } from "../automation/automation.engine";
+import type { AutomationReport } from "../automation/automation.engine";
 import { VISUAL_CHECKLIST } from "../visual/visual.checklist";
 import type { VisualReview, VisualTarget } from "../visual/visual.checklist";
 
@@ -20,7 +22,8 @@ export type SignalType =
   | "SLOW_SITE"
   | "NO_BANNERS"
   | "OLD_BANNERS"
-  | "WEAK_SOCIAL_PROFILE";
+  | "WEAK_SOCIAL_PROFILE"
+  | "AUTOMATION_GAP";
 
 export interface Signal {
   type: SignalType;
@@ -276,4 +279,24 @@ function deriveVisualSignals(
   }
 
   return signals;
+}
+
+/**
+ * Um sinal só quando há área aplicável SEM automação encontrada. A evidência diz o que foi
+ * encontrado e lembra que ausência no site não prova que a empresa não usa a ferramenta.
+ */
+export function deriveAutomationSignal(report: AutomationReport): Signal | null {
+  const gaps = automationGaps(report);
+
+  if (gaps.length === 0) return null;
+
+  const confirmed = gaps.some((g) => g.state === "CONFIRMED_GAP");
+
+  return {
+    type: "AUTOMATION_GAP",
+    value: String(gaps.length),
+    evidence: `Sem automação encontrada em: ${gaps.map((g) => g.label.replace(/ \(.*\)$/, "")).join(", ")}. ${confirmed ? "Parte conferida na revisão; o restante" : "Isso"} vem da leitura do site e precisa ser confirmado com a empresa.`,
+    source: confirmed ? "VISUAL_REVIEW" : "WEBSITE",
+    confidence: confirmed ? 0.7 : 0.5,
+  };
 }

@@ -46,7 +46,7 @@ describe("assessPresence", () => {
 
     expect(r.level).toBe("NONE");
     expect(r.moment).toBe("READY");
-    expect(r.position).toMatch(/Invisível/);
+    expect(r.position).toMatch(/Sem site próprio nem redes sociais encontrados/);
     expect(r.offers[0].service).toBe("SITE_LOJA");
     expect(r.offers[0].reasons[0]).toMatch(/Tem site próprio/);
     expect(r.gaps.map((g) => g.id)).toContain("site.exists");
@@ -98,7 +98,7 @@ describe("assessPresence", () => {
     expect(r.offers[0].reasons.join(" ")).toMatch(/HTTPS|celular/);
   });
 
-  it("presença forte: avançada, com poucas brechas e oferta de automação", () => {
+  it("presença forte: avançada, com poucas brechas", () => {
     const r = assessPresence({
       company: company({ website: "https://clinicasorriso.com.br" }),
       channels: [ch("PHONE", "6533331111"), ch("WHATSAPP", "65992250342", "confirmado no site"), ch("EMAIL", "contato@clinica.com.br"), ch("INSTAGRAM", "clinicasorriso"), ch("FACEBOOK", "clinicasorriso"), ch("LINKEDIN", "company/clinica")],
@@ -113,7 +113,7 @@ describe("assessPresence", () => {
     expect(r.confidence).toBeGreaterThanOrEqual(0.8);
     expect(r.confidence).toBeLessThan(0.85);
     expect(r.pending).toEqual(expect.arrayContaining(["Revisão visual: Instagram", "Revisão visual: Visual do site"]));
-    expect(r.position).toMatch(/Presença forte/);
+    expect(r.position).toMatch(/Presença avançada: nota \d+\/100/);
   });
 
   it("WhatsApp só 'provável' é aviso, não OK; o que não dá para medir nunca derruba a nota", () => {

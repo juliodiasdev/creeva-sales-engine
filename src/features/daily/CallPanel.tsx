@@ -122,6 +122,25 @@ export function CallPanel({
         </p>
       )}
 
+      {dossier.automation.length > 0 && (
+        <div className="automation-ask">
+          <strong>Descobrir na conversa (automação)</strong>
+          <small className="muted">
+            Isso é o que NÃO dá para saber de fora: pergunte, não afirme.
+          </small>
+          <ul className="reasons">
+            {dossier.automation.map((a) => (
+              <li key={a.area}>
+                <strong>{a.area}</strong> — {a.stateLabel}
+                {a.found.length > 0 && <small className="muted"> · {a.found.join(" ")}</small>}
+                <br />
+                Pergunte: “{a.question}”
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="outreach-actions">
         {phone && (
           <button

@@ -8,7 +8,9 @@ import { isGenericHost } from "../../lib/normalize";
 import { startJob } from "../jobs/job.service";
 import { getSetting } from "../settings/settings.service";
 
-import { deriveSignals } from "../signals/signals.engine";
+import { deriveAutomationSignal, deriveSignals } from "../signals/signals.engine";
+import { assessAutomation } from "../automation/automation.engine";
+import { consolidateChannels } from "../contacts/consolidate";
 import { computeScore } from "../scoring/scoring.engine";
 import type { ScoreResult } from "../scoring/scoring.engine";
 import { listVisualReviewsRepository } from "../visual/visual.repository";
@@ -77,7 +79,19 @@ export async function analyzeCompany(companyId: number): Promise<ScoreResult> {
     listVisualReviewsRepository(companyId),
   ]);
 
-  const signals = deriveSignals(company, facts, new Date().getFullYear(), reviews);
+  const automationSignal = deriveAutomationSignal(
+    assessAutomation({
+      company,
+      channels: consolidateChannels(await listChannelsRepository(companyId)).main,
+      facts,
+      reviews,
+    }),
+  );
+
+  const signals = [
+    ...deriveSignals(company, facts, new Date().getFullYear(), reviews),
+    ...(automationSignal ? [automationSignal] : []),
+  ];
   await replaceSignalsRepository(companyId, signals);
 
   const preferred = (

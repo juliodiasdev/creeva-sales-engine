@@ -5,6 +5,7 @@ import { errorMessage, formatDateTime } from "../../lib/format";
 import { listServices } from "../services/services.service";
 import type { Service } from "../services/services.service";
 import { VisualReviewPanel } from "../visual/VisualReviewPanel";
+import { AutomationPanel } from "../automation/AutomationPanel";
 
 import { LEVEL_LABEL, LEVEL_THRESHOLDS, MOMENT_LABEL } from "./presence.engine";
 import type { Check, CheckStatus, SaleMoment } from "./presence.engine";
@@ -152,7 +153,7 @@ export function PresencePanel({
                   <thead>
                     <tr>
                       <th scope="col">Serviço</th>
-                      <th scope="col">Motivos reais (o que foi encontrado)</th>
+                      <th scope="col">Motivos (o que foi encontrado; "a confirmar" = hipótese)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -176,10 +177,13 @@ export function PresencePanel({
             {report.moment === "NO_GAP" && (
               <p className="muted">
                 Não há brecha clara nos pontos medidos. Vale abordar só se houver outro motivo
-                (ex.: crescimento, nova unidade).
+                (ex.: crescimento, nova unidade) ou se a conversa confirmar alguma das hipóteses de
+                automação abaixo.
               </p>
             )}
           </div>
+
+          {report.automation && <AutomationPanel report={report.automation} />}
 
           {report.dimensions.map((d) => (
             <div key={d.key} className="ficha-group">

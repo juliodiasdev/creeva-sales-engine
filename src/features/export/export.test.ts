@@ -123,7 +123,7 @@ describe("planilha: presença digital", () => {
     expect(without.getWorksheet("Presença digital")).toBeUndefined();
 
     base.presence = [
-      { company: "Odonto Alfa", level: "Presença básica", score: 38, moment: "Hora de vender", confidence: 80, position: "Online, mas frágil.", gaps: "HTTPS: sem cadeado", offers: "Sites e lojas virtuais: sem HTTPS" },
+      { company: "Odonto Alfa", level: "Presença básica", score: 38, moment: "Hora de vender", confidence: 80, position: "Online, mas frágil.", gaps: "HTTPS: sem cadeado", offers: "Sites e lojas virtuais: sem HTTPS", automation: "Alto potencial de automação. Sem automação encontrada em: Agenda (a confirmar com a empresa)." },
       { company: "Myrelief", level: "Presença avançada", score: 88, moment: "Poucas brechas", confidence: 95, position: "Forte.", gaps: "", offers: "" },
     ];
 
@@ -135,5 +135,8 @@ describe("planilha: presença digital", () => {
     expect(ws.getRow(2).getCell(1).value).toBe("Odonto Alfa");
     expect(ws.getRow(2).getCell(2).value).toBe("Hora de vender");
     expect(ws.getRow(3).getCell(7).value).toBe("—");
+    expect(ws.getRow(1).getCell(9).value).toBe("Potencial de automação (a confirmar)");
+    expect(ws.getRow(2).getCell(9).value).toMatch(/\(a confirmar com a empresa\)/);
+    expect(ws.getRow(3).getCell(9).value).toBe("—");
   });
 });

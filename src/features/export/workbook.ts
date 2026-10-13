@@ -439,6 +439,7 @@ function addPresence(wb: ExcelJS.Workbook, data: ExportData) {
     { header: "Posição da empresa", width: 52 },
     { header: "Principais lacunas", width: 60 },
     { header: "O que vender (e por quê)", width: 60 },
+    { header: "Potencial de automação (a confirmar)", width: 60 },
   ];
 
   ws.columns = cols.map((c) => ({ width: c.width }));
@@ -454,8 +455,8 @@ function addPresence(wb: ExcelJS.Workbook, data: ExportData) {
           ? { bg: "FFFFF1B8", fg: "FF7A5C00" }
           : { bg: "FFE9EAEC", fg: "FF555555" };
 
-    row.values = [r.company, r.moment, r.level, r.score ?? "—", `${r.confidence}%`, r.position, r.gaps || "—", r.offers || "—"];
-    row.height = Math.max(rowHeight(r.gaps, 60), rowHeight(r.offers, 60), rowHeight(r.position, 52), 24);
+    row.values = [r.company, r.moment, r.level, r.score ?? "—", `${r.confidence}%`, r.position, r.gaps || "—", r.offers || "—", r.automation || "—"];
+    row.height = Math.max(rowHeight(r.gaps, 60), rowHeight(r.offers, 60), rowHeight(r.automation ?? "", 60), rowHeight(r.position, 52), 24);
 
     row.eachCell({ includeEmpty: true }, (cell, n) => {
       if (n > cols.length) return;

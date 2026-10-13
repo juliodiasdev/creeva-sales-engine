@@ -284,6 +284,7 @@ const SIGNAL_SUGGESTION: Record<string, string> = {
   NO_BANNERS: "Criar banners e artes de divulgação profissionais para o Instagram e o site.",
   OLD_BANNERS: "Refazer os banners com visual atual e identidade visual consistente.",
   WEAK_SOCIAL_PROFILE: "Reformular o perfil (foto, bio, link e destaques) para passar profissionalismo.",
+  AUTOMATION_GAP: "Confirmar com a empresa e propor automação (agenda, atendimento, cobrança) onde não encontramos ferramenta.",
 };
 
 /** O que melhorar no NEGÓCIO da empresa (separado dos dados que faltam). */

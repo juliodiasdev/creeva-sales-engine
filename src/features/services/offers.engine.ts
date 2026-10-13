@@ -83,6 +83,9 @@ export function matchServices(input: {
   if (has("OLD_BANNERS")) add("DESIGN_SOCIAL", 4, evidence("OLD_BANNERS"), "OLD_BANNERS");
   if (has("WEAK_SOCIAL_PROFILE")) add("DESIGN_SOCIAL", 3, evidence("WEAK_SOCIAL_PROFILE"), "WEAK_SOCIAL_PROFILE");
 
+  // Automação: hipótese a confirmar, por isso pesa pouco
+  if (has("AUTOMATION_GAP")) add("SISTEMA_AUTOMACAO", 2, evidence("AUTOMATION_GAP"), "AUTOMATION_GAP");
+
   // Landing pages / conversão
   if (has("WEAK_CONVERSION_PATH")) add("LANDING_PAGE", 5, evidence("WEAK_CONVERSION_PATH"), "WEAK_CONVERSION_PATH");
   if (has("NO_CLEAR_CTA")) add("LANDING_PAGE", 3, evidence("NO_CLEAR_CTA"), "NO_CLEAR_CTA");
