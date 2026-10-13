@@ -1129,3 +1129,30 @@ button.small-btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
 .steps-list { display: flex; flex-direction: column; gap: 10px; padding-left: 20px; }
 .steps-list ul { margin: 6px 0 0; }
 code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+
+/* ---------- ficha de enriquecimento ---------- */
+.fs { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid var(--line); }
+.fs-ok { color: #6ee7a0; border-color: #2f6f4b; }
+.fs-partial { color: #f3c969; border-color: #7a6320; }
+.fs-suggested { color: #8cc7ff; border-color: #2f5f8f; }
+.fs-missing { color: #ff8e8e; border-color: #7a3030; }
+.fs-legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ficha-group { margin-top: 18px; }
+.ficha-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ficha-table th, .ficha-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ficha-table thead th { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.ficha-table tbody th { font-weight: 600; white-space: nowrap; }
+.finding-box { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.matrix-cell { text-align: center; }
+
+.view-tabs { display: flex; gap: 8px; margin: 4px 0 12px; }
+.table-scroll { overflow-x: auto; }
+.matrix th[scope="row"] { min-width: 180px; white-space: normal; }
+.ficha-table { table-layout: fixed; }
+.ficha-table th:nth-child(1) { width: 14%; }
+.ficha-table th:nth-child(2) { width: 17%; }
+.ficha-table th:nth-child(3) { width: 26%; }
+.ficha-table th:nth-child(4) { width: 14%; }
+.ficha-table td { overflow-wrap: anywhere; }
+.ficha-table.matrix { table-layout: auto; }
+.ficha-table.matrix th, .ficha-table.matrix td { width: auto; }

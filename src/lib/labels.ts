@@ -62,6 +62,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   GOOGLE_PLACES: "Google",
   WEBSITE: "Site da empresa",
   MANUAL: "Cadastro manual",
+  AI_SEARCH: "Busca com IA (aprovado por você)",
   CNPJ: "CNPJ",
 };
 

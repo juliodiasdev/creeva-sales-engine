@@ -23,6 +23,7 @@ export type ChannelKind =
   | "WEBSITE";
 
 export type ChannelSource =
+  | "AI_SEARCH"
   | "GOOGLE_PLACES"
   | "WEBSITE"
   | "MANUAL";

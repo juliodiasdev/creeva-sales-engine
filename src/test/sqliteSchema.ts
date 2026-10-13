@@ -409,6 +409,27 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX idx_wa_events_processed ON whatsapp_events(processed, direction)`,
     ],
   },
+  {
+    version: 9,
+    name: "enrichment_findings",
+    statements: [
+      `CREATE TABLE enrichment_findings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        field TEXT NOT NULL,
+        value TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        evidence TEXT,
+        verified INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'SUGGESTED',
+        model TEXT,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        decided_at DATETIME,
+        UNIQUE (company_id, field, value)
+      )`,
+      `CREATE INDEX idx_findings_company ON enrichment_findings(company_id, status)`,
+    ],
+  },
 ];
 
 export async function runMigrations(

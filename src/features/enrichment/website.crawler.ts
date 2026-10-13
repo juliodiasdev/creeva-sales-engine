@@ -1,3 +1,4 @@
+import * as cheerio from "cheerio";
 import { httpFetch } from "../../lib/http";
 import { recordApiUsage } from "../jobs/apiUsage.service";
 
@@ -96,4 +97,22 @@ export async function crawlWebsite(
   }
 
   return facts;
+}
+
+/**
+ * Abre uma página só para CONFERIR um dado citado pela busca com IA.
+ * Devolve o HTML (para ver links) e o texto visível; null se não abrir.
+ */
+export async function fetchPageText(
+  url: string,
+): Promise<{ html: string; text: string } | null> {
+  const result = await fetchHtml(withProtocol(url));
+
+  if ("error" in result) return null;
+
+  const $ = cheerio.load(result.html);
+
+  $("script, style, noscript").remove();
+
+  return { html: result.html, text: $("body").text().replace(/\s+/g, " ").trim() };
 }

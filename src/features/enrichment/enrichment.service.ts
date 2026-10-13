@@ -30,6 +30,7 @@ import { listServices } from "../services/services.service";
 import type { ServiceKey } from "../services/services.service";
 
 import { planCompanyWithAi } from "../ai/ai.service";
+import { searchCompanyWithAi } from "./aisearch.service";
 import { crawlWebsite } from "./website.crawler";
 import type { WebsiteFacts } from "./website.facts";
 
@@ -47,6 +48,8 @@ export interface EnrichOptions {
   analyze: boolean;
   /** Plano com IA (OpenAI): 1 chamada por empresa. Opcional e pago. */
   ai?: boolean;
+  /** Buscar na web (OpenAI) o site, contatos e redes que faltam: vira sugestão para você aprovar. */
+  aiSearch?: boolean;
 }
 
 export const DEFAULT_ENRICH_OPTIONS: EnrichOptions = {
@@ -193,6 +196,15 @@ export function startEnrichmentJob(
     for (const [i, id] of companyIds.entries()) {
       try {
         outcomes[id] = await enrichCompany(id, crawlWebsite, options);
+
+        if (options.aiSearch) {
+          // A busca só gera sugestões; falha dela não desfaz o enriquecimento.
+          try {
+            await searchCompanyWithAi(id);
+          } catch (err) {
+            outcomes[id] = `${err instanceof Error ? err.message : "erro"} (busca com IA)`;
+          }
+        }
 
         if (options.ai) {
           // Falha da IA não desfaz o enriquecimento determinístico.

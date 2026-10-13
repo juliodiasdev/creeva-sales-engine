@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { FichaPanel, StatusBadge, StatusLegend } from "../features/enrichment/FichaPanel";
+import { CORE_KEYS, FICHA_LABEL, loadListFicha } from "../features/enrichment/ficha.service";
+import type { ListFichaRow } from "../features/enrichment/ficha.service";
 import { EnrichDialog } from "../features/enrichment/EnrichDialog";
 import { downloadXlsx } from "../features/export/download";
 import { loadExportData } from "../features/export/export.service";
@@ -59,6 +62,10 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
   const [discarding, setDiscarding] = useState(false);
   const [reason, setReason] = useState("");
   const [blockedIds, setBlockedIds] = useState<Set<number>>(new Set());
+  const [view, setView] = useState<"companies" | "enrichment">("companies");
+  const [matrix, setMatrix] = useState<ListFichaRow[]>([]);
+  const [fichaId, setFichaId] = useState<number | null>(null);
+  const [onlyGaps, setOnlyGaps] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +78,7 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
       setList(l);
       setItems(rows);
       setBlockedIds(await suppressedCompanyIds(rows.map((r) => Number(r.company.id))));
+      setMatrix(await loadListFicha(listId));
       setRecommended(await recommendedToQualify(rows));
       setRunning(
         jobs.some(
@@ -339,6 +347,102 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
         />
       )}
 
+      <div className="view-tabs" role="tablist" aria-label="Visão da lista">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "companies"}
+          className={view === "companies" ? "chip active" : "chip"}
+          onClick={() => setView("companies")}
+        >
+          Empresas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "enrichment"}
+          className={view === "enrichment" ? "chip active" : "chip"}
+          onClick={() => setView("enrichment")}
+        >
+          Enriquecimento (o que tem e o que falta)
+        </button>
+      </div>
+
+      {view === "enrichment" && (
+        <section className="panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">CONTROLE DO ENRIQUECIMENTO</span>
+              <h2>Dados de cada empresa</h2>
+            </div>
+
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={onlyGaps}
+                onChange={(e) => setOnlyGaps(e.target.checked)}
+              />
+              <span>Só empresas com dados faltando</span>
+            </label>
+          </div>
+
+          <StatusLegend />
+
+          <div className="table-scroll">
+            <table className="ficha-table matrix">
+              <thead>
+                <tr>
+                  <th scope="col">Empresa</th>
+                  {CORE_KEYS.map((k) => (
+                    <th scope="col" key={k} className="matrix-cell">
+                      {FICHA_LABEL[k]}
+                    </th>
+                  ))}
+                  <th scope="col">Completo</th>
+                  <th scope="col">Sugestões</th>
+                  <th scope="col" />
+                </tr>
+              </thead>
+              <tbody>
+                {matrix
+                  .filter((m) => !onlyGaps || m.ok < m.total)
+                  .map((m) => (
+                    <tr key={m.companyId}>
+                      <th scope="row">{m.name}</th>
+                      {CORE_KEYS.map((k) => (
+                        <td key={k} className="matrix-cell">
+                          <StatusBadge status={m.cells[k] as never} compact />
+                        </td>
+                      ))}
+                      <td>
+                        {m.ok}/{m.total}
+                      </td>
+                      <td>{m.pendingSuggestions > 0 ? `${m.pendingSuggestions} a revisar` : "—"}</td>
+                      <td>
+                        <button type="button" className="secondary" onClick={() => setFichaId(m.companyId)}>
+                          Abrir ficha
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+
+          {matrix.length === 0 && <div className="empty">Nenhuma empresa nesta lista.</div>}
+        </section>
+      )}
+
+      {view === "enrichment" && fichaId !== null && (
+        <FichaPanel
+          key={fichaId}
+          companyId={fichaId}
+          onChanged={() => void load()}
+          onClose={() => setFichaId(null)}
+        />
+      )}
+
+      {view === "companies" && (
       <section className="panel">
         <div className="panel-title">
           <h2>
@@ -458,6 +562,7 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
           </div>
         )}
       </section>
+      )}
 
       <RenamePanel list={list} onDone={(back) => (back ? onBack() : void load())} />
     </>

@@ -41,6 +41,7 @@ import { listServices } from "../features/services/services.service";
 import type { Service, ServiceKey } from "../features/services/services.service";
 import { getLatestSnapshotRepository } from "../features/enrichment/enrichment.repository";
 
+import { FichaPanel } from "../features/enrichment/FichaPanel";
 import { EnrichDialog } from "../features/enrichment/EnrichDialog";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { openExternal } from "../lib/opener";
@@ -242,6 +243,8 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
           }}
         />
       )}
+
+      <FichaPanel companyId={companyId} onChanged={() => void load()} />
 
       <section className="panel">
         <div className="panel-title">

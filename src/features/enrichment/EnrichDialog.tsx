@@ -30,7 +30,7 @@ export function EnrichDialog({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const tooManyForAi = !!options.ai && companyIds.length > MAX_AI;
+  const tooManyForAi = (!!options.ai || !!options.aiSearch) && companyIds.length > MAX_AI;
 
   async function start() {
     try {
@@ -91,6 +91,23 @@ export function EnrichDialog({
       <label className="check">
         <input
           type="checkbox"
+          checked={!!options.aiSearch}
+          onChange={() => toggle("aiSearch")}
+        />
+        <span>
+          <strong>Buscar na web o que falta (opcional)</strong>
+          <small>
+            A OpenAI pesquisa o site oficial, WhatsApp, e-mail e redes sociais que ainda não
+            temos. Cada achado cita a página de origem, o app abre a página para conferir e
+            você aprova ou rejeita um a um: nada entra sem a sua decisão. Pesquisa na web tem
+            custo por busca. Máx. {MAX_AI} por vez.
+          </small>
+        </span>
+      </label>
+
+      <label className="check">
+        <input
+          type="checkbox"
           checked={!!options.ai}
           onChange={() => toggle("ai")}
         />
@@ -119,7 +136,7 @@ export function EnrichDialog({
           disabled={
             busy ||
             tooManyForAi ||
-            (!options.crawlSite && !options.analyze && !options.ai)
+            (!options.crawlSite && !options.analyze && !options.ai && !options.aiSearch)
           }
           onClick={() => void start()}
         >

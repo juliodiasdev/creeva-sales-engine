@@ -18,6 +18,7 @@ export type SettingKey =
   | "company_name"
   | "openai_model"
   | "anthropic_model"
+  | "openai_search_model"
   | "daily_last_run"
   | "daily_send_limit"
   | "data_repairs";
@@ -30,6 +31,7 @@ export const DEFAULTS: Partial<Record<SettingKey, string>> = {
   company_name: "Creava Digital",
   openai_model: "gpt-4o-mini",
   anthropic_model: "claude-sonnet-5-5",
+  openai_search_model: "gpt-4o-mini",
 };
 
 export function isSecret(key: string): boolean {

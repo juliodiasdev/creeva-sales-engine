@@ -48,6 +48,7 @@ const FIELDS: [SettingKey, string, string][] = [
   ["follow_up_delay_days", "Dias até o retorno (follow-up)", "2"],
   ["proposal_follow_up_days", "Dias até o retorno da proposta", "3"],
   ["openai_model", "Modelo OpenAI", "gpt-4o-mini"],
+  ["openai_search_model", "Modelo OpenAI para busca na web (enriquecimento)", "gpt-4o-mini"],
   ["anthropic_model", "Modelo Claude (conversas)", "claude-sonnet-5-5"],
 ];
 

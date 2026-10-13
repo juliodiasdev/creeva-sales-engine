@@ -9,6 +9,7 @@ import {
   normalizeCnpj,
   normalizePhone,
   siteDomain,
+  isGenericHost,
 } from "../../lib/normalize";
 
 import type {
@@ -249,4 +250,34 @@ export async function searchCompaniesRepository(
       .order("name", { ascending: true })
       .limit(limit),
   ) as Pick<Company, "id" | "name" | "city" | "segment" | "lead_status">[];
+}
+
+/**
+ * Define o site OFICIAL aprovado pelo usuário. Só substitui um cadastro vazio
+ * ou que era, na verdade, um link de rede social/plataforma.
+ */
+export async function setCompanyWebsiteRepository(
+  companyId: number,
+  website: string,
+): Promise<{ previousGenericLink: string | null }> {
+  const current = await getCompanyRepository(companyId);
+
+  if (!current) throw new Error("Empresa não encontrada.");
+
+  if (current.website && !isGenericHost(current.website)) {
+    throw new Error("Esta empresa já tem um site cadastrado.");
+  }
+
+  unwrap(
+    await getSupabase()
+      .from("companies")
+      .update({
+        website,
+        domain: siteDomain(website),
+        updated_at: nowIso(),
+      })
+      .eq("id", companyId),
+  );
+
+  return { previousGenericLink: current.website ?? null };
 }
