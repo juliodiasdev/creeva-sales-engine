@@ -36,6 +36,8 @@ import { label, TASK_TYPE_LABEL, PRIORITY_LABEL } from "../lib/labels";
 import { STATUS_LABEL } from "../features/prospects/prospect.labels";
 import type { ProspectStatus } from "../features/prospects/prospect.types";
 import { listConversationSummaries } from "../features/agent/conversation.service";
+import { CallPanel } from "../features/daily/CallPanel";
+import { DayPlanner } from "../features/daily/DayPlanner";
 import { getProcessOverview } from "../features/lists/lists.service";
 import type { ProcessOverview } from "../features/lists/lists.service";
 import type { PageId } from "../components/Sidebar";
@@ -160,6 +162,17 @@ export function TodayPage({ onOpenProspect, onOpenList, onNavigate }: Props) {
             {task.priority === "HIGH" ? ` · prioridade ${label(PRIORITY_LABEL, task.priority).toLowerCase()}` : ""}
           </p>
 
+          {hasOutreach && (
+            <details className="call-details">
+              <summary>Dossiê e ligação</summary>
+              <CallPanel
+                companyId={task.company_id}
+                prospectId={task.prospect_id}
+                onChanged={() => void loadTasks()}
+              />
+            </details>
+          )}
+
           {isOpen && draft && (
             <OutreachPanel
               key={task.id}
@@ -269,6 +282,8 @@ export function TodayPage({ onOpenProspect, onOpenList, onNavigate }: Props) {
         </div>
       )}
     </section>
+
+    <DayPlanner onDone={loadTasks} />
 
     <section className="metrics">
       <article className="metric-card">

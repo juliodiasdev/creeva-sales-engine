@@ -8,6 +8,7 @@ import {
   looksLikeHardStop,
   looksLikeOptOut,
   suppressCompany,
+  suppressedCompanyIds,
   unsuppressCompany,
 } from "../compliance/suppression.service";
 
@@ -109,6 +110,13 @@ export async function recordIncomingMessage(
 
   const conversation = await getOrCreateConversationRepository(companyId);
   const prospect = await findProspectByCompanyRepository(companyId);
+  const hardStop = looksLikeHardStop(text);
+
+  // Pedido formal de parar é respeitado ANTES de qualquer outra coisa: se algo
+  // falhar depois, a supressão já está gravada.
+  if (hardStop) {
+    await confirmOptOut(companyId, "Pedido de parar recebido por mensagem");
+  }
 
   // Qualquer rascunho pendente ficou desatualizado com a nova mensagem.
   await discardPendingDrafts(companyId);
@@ -122,7 +130,7 @@ export async function recordIncomingMessage(
     status: "RECEIVED",
   });
 
-  if (prospect) {
+  if (prospect && !hardStop) {
     const status = prospect.status as ProspectStatus;
 
     if (["READY", "CONTACTED", "NURTURE"].includes(status)) {
@@ -137,21 +145,23 @@ export async function recordIncomingMessage(
     }
   }
 
-  // Pedido formal de parar é respeitado na hora, antes de qualquer IA.
-  if (looksLikeHardStop(text)) {
-    await confirmOptOut(companyId, `Pedido automático detectado: "${text.slice(0, 120)}"`);
-
-    return { messageId, optOutSuspected: false, autoSuppressed: true };
-  }
-
-  return { messageId, optOutSuspected: looksLikeOptOut(text), autoSuppressed: false };
+  return {
+    messageId,
+    optOutSuspected: !hardStop && looksLikeOptOut(text),
+    autoSuppressed: hardStop,
+  };
 }
 
 /** Desfaz um "não contatar" feito por engano (a empresa volta para Nutrição). */
-export async function restoreContact(companyId: number): Promise<void> {
+export async function restoreContact(
+  companyId: number,
+): Promise<{ stillBlocked: boolean }> {
   const conversation = await getConversationRepository(companyId);
 
-  await unsuppressCompany(companyId);
+  const stillBlocked = await unsuppressCompany(companyId);
+
+  // Outro cadastro (mesmo telefone/site/e-mail) continua suprimido: não reabre.
+  if (stillBlocked) return { stillBlocked: true };
 
   if (conversation) {
     await updateConversationRepository(conversation.id, { opted_out: 0 });
@@ -162,6 +172,8 @@ export async function restoreContact(companyId: number): Promise<void> {
   if (prospect?.status === "DO_NOT_CONTACT") {
     await changeProspectStatus(Number(prospect.id), "NURTURE");
   }
+
+  return { stillBlocked: false };
 }
 
 /**
@@ -212,6 +224,10 @@ export async function listConversationSummaries(): Promise<
     listAllMessagesRepository(),
   ]);
 
+  const suppressed = await suppressedCompanyIds(
+    prospects.map((p) => Number(p.company_id)),
+  );
+
   const byCompany = new Map<number, typeof messages>();
 
   for (const m of messages) {
@@ -225,6 +241,10 @@ export async function listConversationSummaries(): Promise<
     const sent = list.filter((m) => m.status !== "DRAFT");
     const last = sent[sent.length - 1];
 
+    const closed =
+      suppressed.has(Number(p.company_id)) ||
+      ["DO_NOT_CONTACT", "WON", "LOST", "DISQUALIFIED"].includes(p.status);
+
     return {
       companyId: Number(p.company_id),
       prospectId: Number(p.id),
@@ -234,10 +254,9 @@ export async function listConversationSummaries(): Promise<
       stage: p.status,
       lastBody: last?.body ?? null,
       lastAt: last?.created_at ?? null,
-      awaitingReply:
-        last?.direction === "IN" && p.status !== "DO_NOT_CONTACT",
+      awaitingReply: last?.direction === "IN" && !closed,
       hasDraft: list.some((m) => m.status === "DRAFT"),
-      optedOut: p.status === "DO_NOT_CONTACT",
+      optedOut: suppressed.has(Number(p.company_id)) || p.status === "DO_NOT_CONTACT",
       messageCount: sent.length,
     };
   });

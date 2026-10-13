@@ -1,4 +1,5 @@
 import { fetchAllPages, getSupabase } from "../../lib/store";
+import { contactedProspectIds } from "../activities/contacted";
 
 export interface DashboardMetrics {
   companiesDiscovered: number;
@@ -94,7 +95,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     countWhere("companies", "lead_status", ["QUALIFIED", "READY"]),
     countWhere("companies", "lead_status", ["DISQUALIFIED"]),
     count("prospects"),
-    distinctProspects("MESSAGE_SENT"),
+    contactedProspectIds().then((ids) => ids.size),
     distinctProspects("REPLY_RECEIVED"),
     distinctProspects("MEETING"),
     distinctProspects("PROPOSAL_SENT"),

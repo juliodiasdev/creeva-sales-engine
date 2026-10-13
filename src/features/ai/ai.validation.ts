@@ -1,3 +1,5 @@
+import { forbiddenContent } from "../../lib/contentGuard";
+
 export interface AiAnalysisResult {
   summary: string;
   main_problem: string;
@@ -82,6 +84,10 @@ export function validateOutreach(
     );
   }
 
+  const forbidden = forbiddenContent(obj.message);
+
+  if (forbidden) throw new Error(`A mensagem da IA ${forbidden}`);
+
   return {
     message: obj.message.trim().slice(0, 1500),
     evidence_used: used,
@@ -112,6 +118,8 @@ export interface AiBottleneck {
   service_key: string;
   impact: string;
   confidence: number;
+  /** Pergunta de descoberta para a ligação (confirma o gargalo sem afirmar). */
+  question?: string;
 }
 
 export interface AiPlanResult {
@@ -181,7 +189,8 @@ export function validatePlan(
       evidence.every((t) => ctx.signalTypes.includes(t)) &&
       Number.isFinite(confidence) &&
       confidence >= 0 &&
-      confidence <= 1;
+      confidence <= 1 &&
+      !forbiddenContent(`${String(b.title)} ${String(b.impact ?? "")}`);
 
     if (valid) {
       bottlenecks.push({
@@ -190,6 +199,11 @@ export function validatePlan(
         service_key: String(b.service_key),
         impact: String(b.impact ?? "").trim().slice(0, 400),
         confidence,
+        ...(typeof b.question === "string" &&
+        b.question.trim() &&
+        !forbiddenContent(b.question)
+          ? { question: b.question.trim().slice(0, 250) }
+          : {}),
       });
     } else {
       dropped++;
@@ -210,6 +224,7 @@ export function validatePlan(
       typeof a.message === "string" &&
       a.message.trim().length > 0 &&
       evidence.every((t) => ctx.signalTypes.includes(t)) &&
+      !forbiddenContent(`${String(a.angle ?? "")} ${a.message}`) &&
       (a.service_key == null ||
         ctx.serviceKeys.includes(String(a.service_key)));
 

@@ -1113,3 +1113,10 @@ button.small-btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
 .conv-item:hover, .conv-item.active, .conv-item:focus-visible { background: var(--surface-2); color: inherit; }
 .conv-item:hover strong, .conv-item.active strong { color: inherit; }
 .conv-item:hover small, .conv-item.active small { color: var(--muted); }
+
+/* ---------- ligações do dia ---------- */
+.call-details { margin-top: 8px; }
+.call-details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.call-panel { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.bottleneck { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.verdicts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }

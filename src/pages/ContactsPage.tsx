@@ -6,6 +6,7 @@ import {
 } from "../features/contacts/contacts.service";
 import type { ContactListItem } from "../features/contacts/contacts.service";
 import { ChannelButtons } from "../features/contacts/ChannelButtons";
+import { suppressedCompanyIds } from "../features/compliance/suppression.service";
 
 import { EnrichDialog } from "../features/enrichment/EnrichDialog";
 import { loadExportData } from "../features/export/export.service";
@@ -32,9 +33,14 @@ export function ContactsPage({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  const [blockedIds, setBlockedIds] = useState<Set<number>>(new Set());
+
   const load = useCallback(async () => {
     try {
-      setItems(await loadContactList(limit));
+      const rows = await loadContactList(limit);
+
+      setItems(rows);
+      setBlockedIds(await suppressedCompanyIds(rows.map((r) => Number(r.company.id))));
     } catch (err) {
       setError(errorMessage(err, "Erro ao carregar contatos."));
     }
@@ -211,6 +217,7 @@ export function ContactsPage({
                       message={wa?.message}
                       subject={`Contato — ${company.name}`}
                       size="small"
+                      blocked={blockedIds.has(Number(company.id))}
                     />
                   </div>
 

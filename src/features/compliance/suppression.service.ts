@@ -1,9 +1,25 @@
-import { fetchAllPages, getSupabase, unwrap } from "../../lib/store";
+import { fetchAllPages, fetchByIds, getSupabase, unwrap } from "../../lib/store";
 
 import { getCompanyRepository } from "../companies/company.repository";
-import { listChannelsRepository } from "../contacts/channels.repository";
+import type { Company } from "../companies/company.types";
+import {
+  listChannelsForCompanies,
+  listChannelsRepository,
+} from "../contacts/channels.repository";
+import type { StoredChannel } from "../contacts/channels.repository";
 
-export type SuppressionKind = "PHONE" | "EMAIL" | "DOMAIN" | "CNPJ" | "COMPANY";
+/**
+ * PLACE (id do Google) e NAME (nome+endereço) identificam a empresa mesmo sem
+ * telefone/e-mail/site/CNPJ e não dependem do id interno (que se repete após
+ * um reset ou restauração de backup).
+ */
+export type SuppressionKind =
+  | "PHONE"
+  | "EMAIL"
+  | "DOMAIN"
+  | "CNPJ"
+  | "PLACE"
+  | "NAME";
 
 export interface Suppression {
   id: number;
@@ -13,16 +29,17 @@ export interface Suppression {
   created_at: string;
 }
 
-/** Identificadores reais da empresa (telefones, e-mails, domínio, CNPJ). */
-async function identifiersOf(
-  companyId: number,
-): Promise<{ kind: SuppressionKind; value: string }[]> {
-  const company = await getCompanyRepository(companyId);
+interface Identifier {
+  kind: SuppressionKind;
+  value: string;
+}
 
-  if (!company) throw new Error("Empresa não encontrada.");
-
-  const channels = await listChannelsRepository(companyId);
-  const ids = new Map<string, { kind: SuppressionKind; value: string }>();
+/** Identificadores reais da empresa (função pura, usada em lote e individual). */
+export function identifiersFrom(
+  company: Company,
+  channels: Pick<StoredChannel, "kind" | "value">[],
+): Identifier[] {
+  const ids = new Map<string, Identifier>();
 
   const add = (kind: SuppressionKind, value: string | null | undefined) => {
     const v = value?.trim().toLowerCase();
@@ -30,8 +47,17 @@ async function identifiersOf(
     if (v) ids.set(`${kind}:${v}`, { kind, value: v });
   };
 
-  // Garante proteção mesmo sem telefone, e-mail, site ou CNPJ.
-  add("COMPANY", String(companyId));
+  add("PLACE", company.google_place_id);
+  // Sem endereço não há dedupe_key: nome+cidade garante proteção mínima.
+  add(
+    "NAME",
+    company.dedupe_key ??
+      `${company.name}|${company.city ?? ""}`
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " "),
+  );
   add("PHONE", company.phone_normalized);
   add("DOMAIN", company.domain);
   add("CNPJ", company.cnpj?.replace(/\D/g, ""));
@@ -45,6 +71,14 @@ async function identifiersOf(
   }
 
   return [...ids.values()];
+}
+
+async function identifiersOf(companyId: number): Promise<Identifier[]> {
+  const company = await getCompanyRepository(companyId);
+
+  if (!company) throw new Error("Empresa não encontrada.");
+
+  return identifiersFrom(company, await listChannelsRepository(companyId));
 }
 
 export async function listSuppressions(): Promise<Suppression[]> {
@@ -101,26 +135,66 @@ export async function isCompanySuppressed(
   );
 }
 
+/** Versão em lote (listas e telas com muitas empresas): quais estão suprimidas? */
+export async function suppressedCompanyIds(
+  companyIds: number[],
+): Promise<Set<number>> {
+  if (companyIds.length === 0) return new Set();
+
+  const [suppressions, companies, channels] = await Promise.all([
+    listSuppressions(),
+    fetchByIds<Company>("companies", "*", "id", companyIds),
+    listChannelsForCompanies(companyIds),
+  ]);
+
+  if (suppressions.length === 0) return new Set();
+
+  const blocked = new Set(suppressions.map((s) => `${s.kind}:${s.value}`));
+  const result = new Set<number>();
+
+  for (const company of companies) {
+    const mine = channels.filter(
+      (c) => Number(c.company_id) === Number(company.id),
+    );
+
+    if (
+      identifiersFrom(company, mine).some((i) =>
+        blocked.has(`${i.kind}:${i.value}`),
+      )
+    ) {
+      result.add(Number(company.id));
+    }
+  }
+
+  return result;
+}
+
 /**
- * Pedido FORMAL de parar (LGPD/WhatsApp): vira supressão automática, sem
- * depender de ninguém lembrar. Só frases inequívocas entram aqui.
+ * Pedido FORMAL e inequívoco de parar: vira supressão automática. Só frases
+ * que ninguém usa numa conversa comercial normal entram aqui; o resto é
+ * apenas alerta (SOFT_NO) para o vendedor decidir.
  */
 const HARD_STOP =
-  /\b(descadastr\w*|pare de|parem de|pode parar|favor parar|para de (me )?(mandar|enviar|chamar|ligar)|n[ãa]o (me )?(chame|mande|envie|ligue|procure)( mais)?|me (tire|retire|remova|exclua)\b|remov\w+ (meu|o meu) (n[úu]mero|contato|cadastro)|sair da lista|spam|denunci\w*|lgpd|bloque(ar|ei|ando)|chega de|parem|n[ãa]o (quero|desejo) (mais )?(receber|mensagens?|contato)|n[ãa]o me incomod\w*|(me )?deixa(m)? (a gente |eu )?em paz|tir\w+ (meu|o meu) (n[úu]mero|contato))/i;
-
-/** Recusa comercial: não é opt-out formal, só um alerta para você decidir. */
-const SOFT_NO =
-  /\b(n[ãa]o (quero|tenho interesse)|sem interesse|agora n[ãa]o|n[ãa]o precisamos|j[áa] tenho (site|sistema|fornecedor))/i;
+  /\b(descadastr\w*|me (tire|tira|retire|retira|remova|remove|exclua|exclui) da lista|sair da lista|(pare|parem|para) de (me |nos )?(mandar|enviar|chamar|ligar|escrever|incomodar|procurar)|n[ãa]o (me |nos )?(chame|chamem|mande|mandem|envie|enviem|ligue|liguem|escreva|escrevam|procure|procurem|incomode|incomodem)( mais)?|(j[áa] )?pedi (pra|para) (voc[êe]s? )?parar|nunca mais (me |nos )?(escreva|mande|envie|chame|ligue)|chega de (mensage(m|ns)|liga[çc][õo]es|contatos?)|n[ãa]o (quero|desejo) (mais )?(receber|mensage(m|ns)|contato)|(me |nos )?deixa(m)? (a gente |eu )?em paz|tir[ea] (o |meu |o meu )(n[úu]mero|contato))/i;
 
 /** Respostas curtas e inequívocas ("PARE", "SAIR"). */
-const HARD_STOP_SHORT = /^\s*(pare|parar|parem|chega|sair|stop|cancelar|descadastrar)\W*$/i;
+const HARD_STOP_SHORT =
+  /^\s*(pare|parar|parem|chega|sair|stop|cancelar|descadastrar)\W*$/i;
+
+/** Recusa ou possível pedido de parar: alerta e bloqueio do rascunho, sem supressão automática. */
+const SOFT_NO =
+  /\b(n[ãa]o (quero|tenho interesse|precisamos|precisa mandar)|sem interesse|agora n[ãa]o|j[áa] tenho (site|sistema|fornecedor)|pode parar|podem parar|para com isso|pare\b|parar de|spam|denunci\w*|lgpd|bloque(ar|ei|ando)|n[ãa]o precisa (mais )?(mandar|enviar))/i;
+
+const norm = (text: string) => text.normalize("NFC");
 
 export function looksLikeHardStop(text: string): boolean {
-  return HARD_STOP.test(text) || HARD_STOP_SHORT.test(text);
+  const t = norm(text);
+
+  return HARD_STOP.test(t) || HARD_STOP_SHORT.test(t);
 }
 
 export function looksLikeSoftNo(text: string): boolean {
-  return SOFT_NO.test(text);
+  return SOFT_NO.test(norm(text));
 }
 
 /** Qualquer sinal de recusa (alerta na tela; o rascunho fica bloqueado). */
@@ -137,17 +211,33 @@ async function sharedWithOthers(
   const supabase = getSupabase();
 
   const column =
-    kind === "PHONE" ? "phone_normalized" : kind === "DOMAIN" ? "domain" : kind === "CNPJ" ? "cnpj" : null;
+    kind === "PHONE"
+      ? "phone_normalized"
+      : kind === "DOMAIN"
+        ? "domain"
+        : kind === "CNPJ"
+          ? "cnpj"
+          : kind === "PLACE"
+            ? "google_place_id"
+            : kind === "NAME"
+              ? "dedupe_key"
+              : null;
 
   if (column) {
     const rows = unwrap(
-      await supabase.from("companies").select("id").eq(column, value).neq("id", companyId).limit(1),
+      await supabase
+        .from("companies")
+        .select("id")
+        .eq(column, value)
+        .neq("id", companyId)
+        .limit(1),
     ) as unknown[];
 
     if (rows.length > 0) return true;
   }
 
-  const kinds = kind === "PHONE" ? ["PHONE", "WHATSAPP"] : kind === "EMAIL" ? ["EMAIL"] : [];
+  const kinds =
+    kind === "PHONE" ? ["PHONE", "WHATSAPP"] : kind === "EMAIL" ? ["EMAIL"] : [];
 
   if (kinds.length > 0) {
     const rows = unwrap(
@@ -169,15 +259,14 @@ async function sharedWithOthers(
 /**
  * Desfaz uma supressão feita por engano. Identificadores que outra empresa
  * também usa (mesmo telefone, site...) continuam suprimidos: não é seguro
- * reabrir o contato de quem pode ser o mesmo negócio.
+ * reabrir o contato de quem pode ser o mesmo negócio. Devolve true quando
+ * a empresa AINDA fica bloqueada por causa desses identificadores.
  */
-export async function unsuppressCompany(companyId: number): Promise<void> {
+export async function unsuppressCompany(companyId: number): Promise<boolean> {
   const rows = await identifiersOf(companyId);
 
   for (const r of rows) {
-    if (r.kind !== "COMPANY" && (await sharedWithOthers(r.kind, r.value, companyId))) {
-      continue;
-    }
+    if (await sharedWithOthers(r.kind, r.value, companyId)) continue;
 
     unwrap(
       await getSupabase()
@@ -187,4 +276,6 @@ export async function unsuppressCompany(companyId: number): Promise<void> {
         .eq("value", r.value),
     );
   }
+
+  return isCompanySuppressed(companyId);
 }

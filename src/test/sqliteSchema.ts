@@ -370,6 +370,23 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 7,
+    name: "bottleneck_feedback",
+    statements: [
+      `CREATE TABLE bottleneck_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        analysis_id INTEGER,
+        title TEXT NOT NULL,
+        evidence TEXT,
+        service_key TEXT,
+        verdict TEXT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (company_id, title)
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(

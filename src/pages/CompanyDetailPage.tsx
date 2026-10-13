@@ -28,6 +28,7 @@ import { createProspect } from "../features/prospects/prospect.service";
 
 import { consolidateChannels } from "../features/contacts/consolidate";
 import { ChannelButtons } from "../features/contacts/ChannelButtons";
+import { isCompanySuppressed } from "../features/compliance/suppression.service";
 import { listChannelsRepository } from "../features/contacts/channels.repository";
 import type { StoredChannel } from "../features/contacts/channels.repository";
 import { listApproachesRepository } from "../features/contacts/approaches.repository";
@@ -59,6 +60,7 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
   const [score, setScore] = useState<StoredScore | null>(null);
   const [analysis, setAnalysis] = useState<StoredAnalysis | null>(null);
   const [channels, setChannels] = useState<StoredChannel[]>([]);
+  const [suppressed, setSuppressed] = useState(false);
   const [approaches, setApproaches] = useState<StoredApproach[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [matches, setMatches] = useState<ReturnType<typeof matchServices>>([]);
@@ -86,6 +88,7 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
       setScore(sc);
       setAnalysis(a);
       setChannels(ch);
+      setSuppressed(await isCompanySuppressed(companyId));
       setApproaches(ap);
       setServices(svc);
       setMatches(
@@ -252,6 +255,7 @@ export function CompanyDetailPage({ companyId, onBack, onOpenProspect }: Props) 
               approaches.find((a) => a.channel === "WHATSAPP"))?.message
           }
           subject={`Contato — ${company.name}`}
+          blocked={suppressed}
         />
 
         {channels.length > 0 && (() => {

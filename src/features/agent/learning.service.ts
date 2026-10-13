@@ -1,4 +1,5 @@
 import { fetchAllPages, getSupabase } from "../../lib/store";
+import { contactedProspectIds } from "../activities/contacted";
 
 import { listAllMessagesRepository } from "./agent.repository";
 
@@ -13,7 +14,18 @@ export interface ServiceFunnelRow {
   won: number;
 }
 
+export interface DiagnosisAccuracy {
+  /** Gargalos que você já avaliou depois da ligação/conversa. */
+  evaluated: number;
+  confirmed: number;
+  wrong: number;
+  unknown: number;
+  /** Precisão por tipo de sinal (só confirmados + errados). */
+  bySignal: { type: string; confirmed: number; wrong: number }[];
+}
+
 export interface LearningSummary {
+  diagnosis: DiagnosisAccuracy;
   byService: ServiceFunnelRow[];
   /** Mensagens do agente enviadas (aprovadas) e quantas o vendedor editou. */
   aiSent: number;
@@ -104,7 +116,7 @@ export async function getLearningSummary(): Promise<LearningSummary> {
       activities.filter((a) => a.type === type).map((a) => Number(a.prospect_id)),
     );
 
-  const contacted = had("MESSAGE_SENT");
+  const contacted = await contactedProspectIds();
   const replied = had("REPLY_RECEIVED");
   const meetings = had("MEETING");
   const proposals = had("PROPOSAL_SENT");
@@ -137,12 +149,56 @@ export async function getLearningSummary(): Promise<LearningSummary> {
     rows.set(key, row);
   }
 
+  const feedback = await fetchAllPages<{
+    id: number;
+    evidence: string | null;
+    verdict: string;
+  }>((from, to) =>
+    supabase
+      .from("bottleneck_feedback")
+      .select("id,evidence,verdict")
+      .order("id", { ascending: true })
+      .range(from, to) as never,
+  );
+
+  const signalStats = new Map<string, { confirmed: number; wrong: number }>();
+
+  for (const f of feedback) {
+    if (f.verdict !== "CONFIRMED" && f.verdict !== "WRONG") continue;
+
+    let types: string[] = [];
+
+    try {
+      types = JSON.parse(f.evidence ?? "[]") as string[];
+    } catch {
+      // sem evidência registrada
+    }
+
+    for (const type of types) {
+      const cur = signalStats.get(type) ?? { confirmed: 0, wrong: 0 };
+
+      if (f.verdict === "CONFIRMED") cur.confirmed++;
+      else cur.wrong++;
+
+      signalStats.set(type, cur);
+    }
+  }
+
   const messages = await listAllMessagesRepository();
   const aiSent = messages.filter(
     (m) => m.author === "AI" && m.status === "SENT",
   );
 
   return {
+    diagnosis: {
+      evaluated: feedback.length,
+      confirmed: feedback.filter((f) => f.verdict === "CONFIRMED").length,
+      wrong: feedback.filter((f) => f.verdict === "WRONG").length,
+      unknown: feedback.filter((f) => f.verdict === "UNKNOWN").length,
+      bySignal: [...signalStats.entries()]
+        .map(([type, v]) => ({ type, ...v }))
+        .sort((a, b) => b.confirmed + b.wrong - (a.confirmed + a.wrong)),
+    },
     byService: [...rows.values()].sort((a, b) => b.prospects - a.prospects),
     aiSent: aiSent.length,
     aiEdited: aiSent.filter((m) => Number(m.edited) === 1).length,

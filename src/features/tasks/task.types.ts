@@ -37,6 +37,8 @@ export interface Task {
 
 export interface TaskWithProspect
   extends Task {
+  company_id: number;
+
   company_name: string;
 
   prospect_status: string;

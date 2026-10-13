@@ -22,6 +22,7 @@ import type { ProspectList } from "../features/lists/lists.repository";
 import { channelOpenUrl, CHANNEL_LABEL } from "../features/contacts/channels.engine";
 import { consolidateChannels } from "../features/contacts/consolidate";
 import { openExternal } from "../lib/opener";
+import { suppressedCompanyIds } from "../features/compliance/suppression.service";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { ConfirmButton } from "../components/ConfirmButton";
@@ -57,6 +58,7 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
   const [message, setMessage] = useState("");
   const [discarding, setDiscarding] = useState(false);
   const [reason, setReason] = useState("");
+  const [blockedIds, setBlockedIds] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +70,7 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
 
       setList(l);
       setItems(rows);
+      setBlockedIds(await suppressedCompanyIds(rows.map((r) => Number(r.company.id))));
       setRecommended(await recommendedToQualify(rows));
       setRunning(
         jobs.some(
@@ -253,7 +256,9 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
             onClick={() =>
               void run(async () => {
                 const r = await startOutreach(target(["QUALIFIED"]));
-                return `${r.done} empresa(s) em abordagem. As tarefas estão em "Hoje".`;
+                return `${r.done} empresa(s) em abordagem. As tarefas estão em "Hoje".${
+                  r.suppressed ? ` ${r.suppressed} ignorada(s): estão na lista de não contatar.` : ""
+                }`;
               })
             }
           >
@@ -376,7 +381,9 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
 
             {shown.map((i) => {
               const c = i.company;
-              const wa = i.channels.find((ch) => ch.kind === "WHATSAPP");
+              const wa = blockedIds.has(Number(c.id))
+                ? undefined
+                : i.channels.find((ch) => ch.kind === "WHATSAPP");
 
               return (
                 <div className="list-row" key={c.id}>
@@ -397,6 +404,9 @@ export function ListDetailPage({ listId, onBack, onOpenCompany }: Props) {
                   </div>
 
                   <div>
+                    {blockedIds.has(Number(c.id)) && (
+                      <small className="error-text">Não contatar (pediu para parar)</small>
+                    )}
                     <small>{c.phone ? formatPhone(c.phone) : "sem telefone"}</small>
                     <small>{c.website || "sem site"}</small>
                     {consolidateChannels(i.channels).main.length > 0 && (

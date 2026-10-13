@@ -5,5 +5,5 @@ export function ErrorMessage({
 }) {
   if (!message) return null;
 
-  return <p className="error">{message}</p>;
+  return <p className="error" role="alert">{message}</p>;
 }

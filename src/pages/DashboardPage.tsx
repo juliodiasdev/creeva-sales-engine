@@ -159,6 +159,54 @@ export function DashboardPage() {
         <p className="muted small">A porcentagem à direita é a conversão em relação à etapa anterior.</p>
       </section>
 
+      {learning && learning.diagnosis.evaluated > 0 && (
+        <section className="panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">O DIAGNÓSTICO APRENDE</span>
+              <h2>Precisão dos gargalos apontados pela IA</h2>
+            </div>
+          </div>
+
+          <p>
+            Você avaliou <strong>{learning.diagnosis.evaluated}</strong> gargalo(s):{" "}
+            {learning.diagnosis.confirmed} confirmado(s), {learning.diagnosis.wrong} errado(s),{" "}
+            {learning.diagnosis.unknown} sem saber.
+            {learning.diagnosis.confirmed + learning.diagnosis.wrong > 0 && (
+              <>
+                {" "}
+                Precisão:{" "}
+                <strong>
+                  {pct(
+                    learning.diagnosis.confirmed /
+                      (learning.diagnosis.confirmed + learning.diagnosis.wrong),
+                  )}
+                </strong>
+                .
+              </>
+            )}
+          </p>
+
+          {learning.diagnosis.bySignal.length > 0 && (
+            <div className="perf-table">
+              {learning.diagnosis.bySignal.map((sg) => (
+                <div className="perf-row sig-row" key={sg.type}>
+                  <span>{SIGNAL_LABEL[sg.type] ?? sg.type}</span>
+                  <strong>
+                    {sg.confirmed} de {sg.confirmed + sg.wrong} confirmados
+                  </strong>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="muted small">
+            Sinais com poucos casos variam muito. Com mais ligações o app mostra quais evidências
+            realmente se confirmam.
+          </p>
+        </section>
+      )}
+
       {learning && learning.byService.length > 0 && (
         <section className="panel">
           <div className="panel-title">

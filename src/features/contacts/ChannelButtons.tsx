@@ -13,14 +13,23 @@ export function ChannelButtons({
   message,
   subject,
   size = "normal",
+  blocked = false,
 }: {
   channels: StoredChannel[];
   /** Mensagem pronta (WhatsApp e e-mail abrem já preenchidos). */
   message?: string;
   subject?: string;
   size?: "normal" | "small";
+  /** Empresa na lista de supressão: nenhum atalho de contato é exibido. */
+  blocked?: boolean;
 }) {
   const [error, setError] = useState("");
+
+  if (blocked) {
+    return (
+      <span className="muted">Não contatar (pediu para parar)</span>
+    );
+  }
 
   if (channels.length === 0) {
     return <span className="muted">Sem canais de contato</span>;

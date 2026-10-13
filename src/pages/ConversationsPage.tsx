@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   approveDraft,
@@ -48,10 +48,19 @@ export function ConversationsPage({
   const [filter, setFilter] = useState<Filter>("ALL");
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  // Textos em edição ficam aqui: não se perdem ao trocar de conversa.
+  const [texts, setTexts] = useState<Record<string, string>>({});
+  const setText = useCallback(
+    (key: string, value: string) => setTexts((t) => ({ ...t, [key]: value })),
+    [],
+  );
 
   const refresh = useCallback(async () => {
     try {
+      setError("");
       setItems(await listConversationSummaries());
+      setLoaded(true);
     } catch (err) {
       setError(errorMessage(err, "Erro ao carregar conversas."));
     }
@@ -94,6 +103,7 @@ export function ConversationsPage({
               type="button"
               key={key}
               className={filter === key ? "chip active" : "chip"}
+              aria-pressed={filter === key}
               onClick={() => setFilter(key)}
             >
               {text}
@@ -103,7 +113,9 @@ export function ConversationsPage({
 
         <ErrorMessage message={error} />
 
-        {visible.length === 0 ? (
+        {!loaded && !error ? (
+          <div className="empty">Carregando conversas…</div>
+        ) : visible.length === 0 ? (
           <div className="empty">
             {items.length === 0
               ? "Nenhuma empresa em abordagem ainda. Qualifique empresas em uma lista e inicie a abordagem."
@@ -116,6 +128,7 @@ export function ConversationsPage({
                 type="button"
                 key={i.companyId}
                 className={i.companyId === selected ? "conv-item active" : "conv-item"}
+                aria-current={i.companyId === selected}
                 onClick={() => setSelected(i.companyId)}
               >
                 <strong>{i.companyName}</strong>
@@ -139,6 +152,8 @@ export function ConversationsPage({
           <ThreadView
             key={current.companyId}
             summary={current}
+            texts={texts}
+            setText={setText}
             onChanged={() => void refresh()}
             onOpenCompany={onOpenCompany}
           />
@@ -157,10 +172,14 @@ export function ConversationsPage({
 
 function ThreadView({
   summary,
+  texts,
+  setText,
   onChanged,
   onOpenCompany,
 }: {
   summary: ConversationSummary;
+  texts: Record<string, string>;
+  setText: (key: string, value: string) => void;
   onChanged: () => void;
   onOpenCompany: (id: number) => void;
 }) {
@@ -168,14 +187,18 @@ function ThreadView({
   const [thread, setThread] = useState<Thread | null>(null);
   const [analysis, setAnalysis] = useState<StoredAnalysis | null>(null);
   const [channels, setChannels] = useState<StoredChannel[]>([]);
-  const [incoming, setIncoming] = useState("");
-  const [manual, setManual] = useState("");
-  const [draftText, setDraftText] = useState<Record<number, string>>({});
+  const incoming = texts[`incoming:${companyId}`] ?? "";
+  const manual = texts[`manual:${companyId}`] ?? "";
+  const setIncoming = (v: string) => setText(`incoming:${companyId}`, v);
+  const setManual = (v: string) => setText(`manual:${companyId}`, v);
+  const draftKey = (id: number) => `draft:${id}`;
   const [busy, setBusy] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
+      setError("");
       const [t, a, ch] = await Promise.all([
         loadThread(companyId),
         getLatestAnalysis(companyId),
@@ -193,6 +216,12 @@ function ThreadView({
   useEffect(() => {
     void load();
   }, [load]);
+
+  const messageCount = thread?.messages.length ?? 0;
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView?.({ block: "end" });
+  }, [messageCount]);
 
   async function run(name: string, fn: () => Promise<void>) {
     try {
@@ -218,7 +247,7 @@ function ThreadView({
   const awaiting = sent.length > 0 && sent[sent.length - 1].direction === "IN";
   const bottlenecks = parseBottlenecks(analysis);
   const main = consolidateChannels(channels).main;
-  const whatsapp = main.find((c) => c.kind === "WHATSAPP") ?? main.find((c) => c.kind === "PHONE");
+  const whatsapp = main.find((c) => c.kind === "WHATSAPP");
   const blocked = thread.suppressed;
 
   return (
@@ -258,7 +287,17 @@ function ThreadView({
                 type="button"
                 className="secondary"
                 disabled={!!busy}
-                onClick={() => void run("restore", () => restoreContact(companyId))}
+                onClick={() =>
+                  void run("restore", async () => {
+                    const { stillBlocked } = await restoreContact(companyId);
+
+                    if (stillBlocked) {
+                      throw new Error(
+                        "Outro cadastro com o mesmo telefone, e-mail ou site continua na lista de supressão, então esta empresa segue bloqueada.",
+                      );
+                    }
+                  })
+                }
               >
                 Foi engano: desfazer
               </button>
@@ -314,6 +353,7 @@ function ThreadView({
               </div>
             ))
         )}
+        <div ref={endRef} />
       </div>
 
       {draft && !blocked && (
@@ -333,8 +373,9 @@ function ThreadView({
 
           <textarea
             rows={5}
-            value={draftText[draft.id] ?? draft.body}
-            onChange={(e) => setDraftText({ ...draftText, [draft.id]: e.target.value })}
+            value={texts[draftKey(draft.id)] ?? draft.body}
+            aria-label="Rascunho da mensagem"
+            onChange={(e) => setText(draftKey(draft.id), e.target.value)}
           />
 
           <div className="outreach-actions">
@@ -344,7 +385,7 @@ function ThreadView({
                 className="secondary"
                 onClick={() =>
                   void openExternal(
-                    channelOpenUrl(whatsapp, draftText[draft.id] ?? draft.body),
+                    channelOpenUrl(whatsapp, texts[draftKey(draft.id)] ?? draft.body),
                   ).catch((e) => setError(errorMessage(e, "Erro ao abrir o WhatsApp.")))
                 }
               >
@@ -357,7 +398,7 @@ function ThreadView({
               disabled={!!busy}
               onClick={() =>
                 void run("approve", () =>
-                  approveDraft(draft.id, draftText[draft.id] ?? draft.body),
+                  approveDraft(draft.id, texts[draftKey(draft.id)] ?? draft.body),
                 )
               }
             >
@@ -386,6 +427,7 @@ function ThreadView({
             rows={3}
             value={incoming}
             onChange={(e) => setIncoming(e.target.value)}
+            aria-label="Resposta do contato"
             placeholder="Cole aqui o que a pessoa respondeu no WhatsApp"
           />
 
@@ -422,6 +464,7 @@ function ThreadView({
               rows={2}
               value={manual}
               onChange={(e) => setManual(e.target.value)}
+              aria-label="Mensagem enviada por você"
               placeholder="Mensagem enviada por você"
             />
             <button
